@@ -1,0 +1,72 @@
+name: Validate Ansible
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - "ansible/**"
+      - "ansible.cfg"
+      - ".github/workflows/ansible-validate.yml"
+  push:
+    branches:
+      - main
+    paths:
+      - "ansible/**"
+      - "ansible.cfg"
+      - ".github/workflows/ansible-validate.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    name: Validate infrastructure
+    runs-on:
+      - self-hosted
+      - linux
+      - x64
+      - ansible
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Verify execution context
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          echo "User: $(whoami)"
+          echo "Host: $(hostname)"
+          echo "Workspace: ${GITHUB_WORKSPACE}"
+
+      - name: Verify Ansible environment
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          source /opt/automation/bin/activate-kubespray
+
+          command -v ansible
+          ansible --version
+          ansible-config dump --only-changed
+
+      - name: Validate inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          source /opt/automation/bin/activate-kubespray
+
+          ansible-inventory --graph
+
+      - name: Check playbook syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          source /opt/automation/bin/activate-kubespray
+
+          ansible-playbook \
+            ansible/playbooks/setup.yml \
+            --syntax-check
