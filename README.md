@@ -34,7 +34,7 @@ Detailed documentation:
 - [Infrastructure repository structure](docs/infrastructure-README.md)
 - [Shared Ansible and Kubespray runtime](docs/automation-runtime.md)
 - [GitHub Actions self-hosted runner](docs/github-actions-runner.md)
-- [GitHub SSH access for collaborators](docs/github-ssh.md)
+- [GitHub SSH access](docs/github-ssh.md)
 
 ## Current Status
 
