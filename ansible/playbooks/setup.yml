@@ -1,0 +1,9 @@
+---
+- name: Validate managed nodes
+  hosts: managed_nodes
+  gather_facts: true
+  become: true
+
+  tasks:
+    - name: Verify Ansible connectivity
+      ansible.builtin.ping:
