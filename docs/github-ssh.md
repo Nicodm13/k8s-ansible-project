@@ -1,4 +1,4 @@
-# GitHub SSH Access for Project Collaborators
+# GitHub SSH Access
 
 This document explains how project collaborators configure GitHub access through SSH.
 
