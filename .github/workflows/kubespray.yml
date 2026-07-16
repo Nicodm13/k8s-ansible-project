@@ -1,0 +1,183 @@
+name: Kubespray Control
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - "kubespray/inventory/**"
+
+  workflow_dispatch:
+    inputs:
+      operation:
+        description: Kubespray operation
+        required: true
+        default: validate
+        type: choice
+        options:
+          - validate
+          - facts
+          - reconcile
+          - scale
+          - upgrade
+
+      limit:
+        description: Optional node limit for scale, for example worker3
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: kubespray-control
+  cancel-in-progress: false
+
+jobs:
+  kubespray:
+    name: Run Kubespray
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+
+    timeout-minutes: 240
+
+    env:
+      KUBESPRAY_DIR: /opt/automation/sources/kubespray-v2.31.0
+      KUBESPRAY_VENV: /opt/automation/venvs/kubespray-current
+      INVENTORY: ${{ github.workspace }}/kubespray/inventory/mycluster/inventory.ini
+      ANSIBLE_CONFIG: /opt/automation/sources/kubespray-v2.31.0/ansible.cfg
+      ANSIBLE_HOST_KEY_CHECKING: "True"
+      OPERATION: ${{ github.event_name == 'push' && 'reconcile' || inputs.operation }}
+      LIMIT: ${{ github.event_name == 'workflow_dispatch' && inputs.limit || '' }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify Kubespray runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -x "$KUBESPRAY_VENV/bin/ansible"
+          test -x "$KUBESPRAY_VENV/bin/ansible-playbook"
+          test -f "$KUBESPRAY_DIR/cluster.yml"
+          test -f "$INVENTORY"
+
+          echo "Operation: $OPERATION"
+          echo "Inventory: $INVENTORY"
+
+          "$KUBESPRAY_VENV/bin/ansible" --version
+
+      - name: Validate inventory
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          "$KUBESPRAY_VENV/bin/ansible-inventory" \
+            -i "$INVENTORY" \
+            --graph
+
+      - name: Test SSH connectivity
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          "$KUBESPRAY_VENV/bin/ansible" \
+            -i "$INVENTORY" \
+            all \
+            -m ansible.builtin.ping
+
+      - name: Test sudo access
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          "$KUBESPRAY_VENV/bin/ansible" \
+            -i "$INVENTORY" \
+            all \
+            --become \
+            -m ansible.builtin.command \
+            -a "whoami"
+
+      - name: Validate cluster playbook
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd "$KUBESPRAY_DIR"
+
+          "$KUBESPRAY_VENV/bin/ansible-playbook" \
+            -i "$INVENTORY" \
+            cluster.yml \
+            --syntax-check
+
+      - name: Run requested Kubespray operation
+        if: ${{ env.OPERATION != 'validate' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          cd "$KUBESPRAY_DIR"
+
+          ANSIBLE_PLAYBOOK="$KUBESPRAY_VENV/bin/ansible-playbook"
+
+          case "$OPERATION" in
+            facts)
+              PLAYBOOK="playbooks/facts.yml"
+              ;;
+
+            reconcile)
+              PLAYBOOK="cluster.yml"
+              ;;
+
+            scale)
+              echo "Refreshing facts for every existing node before scaling"
+
+              "$ANSIBLE_PLAYBOOK" \
+                -i "$INVENTORY" \
+                playbooks/facts.yml \
+                --become
+
+              PLAYBOOK="scale.yml"
+              ;;
+
+            upgrade)
+              PLAYBOOK="upgrade-cluster.yml"
+              ;;
+
+            *)
+              echo "Unsupported operation: $OPERATION"
+              exit 1
+              ;;
+          esac
+
+          ARGS=(
+            -i "$INVENTORY"
+            "$PLAYBOOK"
+            --become
+          )
+
+          if [[ "$OPERATION" == "scale" && -n "$LIMIT" ]]; then
+            ARGS+=(--limit "$LIMIT")
+          fi
+
+          "$ANSIBLE_PLAYBOOK" "${ARGS[@]}"
+
+      - name: Verify Kubernetes cluster
+        if: ${{ env.OPERATION != 'validate' && env.OPERATION != 'facts' }}
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          sudo -n kubectl \
+            --kubeconfig=/etc/kubernetes/admin.conf \
+            get nodes -o wide
+
+          sudo -n kubectl \
+            --kubeconfig=/etc/kubernetes/admin.conf \
+            get pods -n kube-system
