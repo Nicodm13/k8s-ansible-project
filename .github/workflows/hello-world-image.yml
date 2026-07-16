@@ -1,0 +1,75 @@
+name: Build Hello World Image
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "applications/hello-world/app/**"
+      - ".github/workflows/hello-world-image.yml"
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: hello-world-image
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build and publish image
+    runs-on: ubuntu-latest
+
+    env:
+      IMAGE_NAME: ghcr.io/nicodm13/k8s-ansible-project/hello-world
+      DEPLOYMENT_FILE: applications/hello-world/deployment.yaml
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        uses: docker/build-push-action@v6
+        with:
+          context: applications/hello-world/app
+          push: true
+          tags: |
+            ${{ env.IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.IMAGE_NAME }}:latest
+
+      - name: Update Flux manifest image tag
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          IMAGE="${IMAGE_NAME}:${GITHUB_SHA}"
+
+          sed -i -E "s#image: ${IMAGE_NAME}:[^[:space:]]+#image: ${IMAGE}#" "$DEPLOYMENT_FILE"
+
+          git diff -- "$DEPLOYMENT_FILE"
+
+      - name: Commit deployment manifest update
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- "$DEPLOYMENT_FILE"; then
+            echo "Deployment manifest already points at this image."
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add "$DEPLOYMENT_FILE"
+          git commit -m "Deploy hello-world image ${GITHUB_SHA}"
+          git push

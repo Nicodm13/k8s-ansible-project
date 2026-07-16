@@ -16,17 +16,12 @@ spec:
         app.kubernetes.io/name: hello-world
     spec:
       containers:
-        - name: nginx
-          image: nginx:1.27-alpine
+        - name: hello-world
+          image: ghcr.io/nicodm13/k8s-ansible-project/hello-world:latest
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
               containerPort: 80
-          volumeMounts:
-            - name: content
-              mountPath: /usr/share/nginx/html/index.html
-              subPath: index.html
-              readOnly: true
           readinessProbe:
             httpGet:
               path: /
@@ -39,7 +34,3 @@ spec:
               port: http
             initialDelaySeconds: 10
             periodSeconds: 20
-      volumes:
-        - name: content
-          configMap:
-            name: hello-world-content
