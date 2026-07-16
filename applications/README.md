@@ -29,10 +29,3 @@ For Traefik ingress, use:
 ```yaml
 ingressClassName: traefik
 ```
-
-Current Traefik entrypoint is exposed by NodePort:
-
-```text
-HTTP  -> 30080
-HTTPS -> 30443
-```

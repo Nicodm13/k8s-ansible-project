@@ -37,8 +37,7 @@ spec:
     service:
       enabled: true
       spec:
-        type: NodePort
-        externalTrafficPolicy: Cluster
+        type: ClusterIP
 
     ingressClass:
       enabled: true
@@ -55,14 +54,12 @@ spec:
         expose:
           default: true
         exposedPort: 80
-        nodePort: 30080
         protocol: TCP
 
       websecure:
         expose:
           default: true
         exposedPort: 443
-        nodePort: 30443
         protocol: TCP
 
     # logs:
