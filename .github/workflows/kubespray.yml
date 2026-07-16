@@ -5,7 +5,7 @@ on:
     branches:
       - main
     paths:
-      - "kubespray/inventory/**"
+      - "clusters/azure/kubespray/inventory/**"
 
   workflow_dispatch:
     inputs:
@@ -46,7 +46,7 @@ jobs:
     env:
       KUBESPRAY_DIR: /opt/automation/sources/kubespray-v2.31.0
       KUBESPRAY_VENV: /opt/automation/venvs/kubespray-current
-      INVENTORY: ${{ github.workspace }}/kubespray/inventory/mycluster/inventory.ini
+      INVENTORY: ${{ github.workspace }}/clusters/azure/kubespray/inventory/mycluster/inventory.ini
       ANSIBLE_CONFIG: /opt/automation/sources/kubespray-v2.31.0/ansible.cfg
       ANSIBLE_HOST_KEY_CHECKING: "True"
       OPERATION: ${{ github.event_name == 'push' && 'reconcile' || inputs.operation }}

@@ -225,7 +225,7 @@ Do not copy or modify the full Kubespray source inside this repository.
 The project-specific Kubespray inventory is stored under:
 
 ```text
-kubespray/inventory/mycluster/
+clusters/azure/kubespray/inventory/mycluster/
 ```
 
 It is created from the sample inventory belonging to the pinned Kubespray version.
@@ -235,7 +235,7 @@ The files must be customized before deploying a cluster.
 Typical contents include:
 
 ```text
-kubespray/inventory/mycluster/
+clusters/azure/kubespray/inventory/mycluster/
 ├── inventory.ini
 ├── group_vars/
 │   ├── all/
@@ -265,7 +265,7 @@ cd "$KUBESPRAY_SOURCE"
 Run the cluster playbook:
 
 ```bash
-ansible-playbook   -i "$REPOSITORY_ROOT/kubespray/inventory/mycluster/inventory.ini"   cluster.yml
+ansible-playbook   -i "$REPOSITORY_ROOT/clusters/azure/kubespray/inventory/mycluster/inventory.ini"   cluster.yml
 ```
 
 Do not run Kubespray's `cluster.yml` from the infrastructure repository root.
