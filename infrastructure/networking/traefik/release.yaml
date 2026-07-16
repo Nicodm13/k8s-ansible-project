@@ -48,6 +48,6 @@ spec:
       websecure:
         port: 443
 
-    logs:
-      general:
-        level: INFO
+    # logs:
+    #   general:
+    #     level: INFO
