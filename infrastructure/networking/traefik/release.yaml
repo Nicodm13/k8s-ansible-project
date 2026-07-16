@@ -1,0 +1,53 @@
+apiVersion: helm.toolkit.fluxcd.io/v2
+kind: HelmRelease
+metadata:
+  name: traefik
+  namespace: traefik
+
+spec:
+  interval: 30m
+
+  chart:
+    spec:
+      chart: traefik
+      version: "3.7.5"
+      sourceRef:
+        kind: HelmRepository
+        name: traefik
+        namespace: flux-system
+      interval: 6h
+
+  install:
+    createNamespace: false
+
+  upgrade:
+    cleanupOnFail: true
+
+  values:
+
+    deployment:
+      replicas: 1
+
+    hostNetwork: true
+
+    service:
+      enabled: false
+
+    ingressClass:
+      enabled: true
+      isDefaultClass: true
+
+    providers:
+      kubernetesIngress:
+        enabled: true
+
+    ports:
+      web:
+        port: 80
+
+      websecure:
+        port: 443
+
+    logs:
+      general:
+        level: INFO
