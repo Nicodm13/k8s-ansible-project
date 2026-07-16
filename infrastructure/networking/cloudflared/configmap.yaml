@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cloudflared-config
+  namespace: cloudflared
+data:
+  config.yaml: |
+    tunnel: mydomain-tunnel
+    credentials-file: /etc/cloudflared/credentials/credentials.json
+
+    ingress:
+      - hostname: mydomain.dk
+        service: http://traefik.traefik.svc.cluster.local:80
+      - hostname: "*.mydomain.dk"
+        service: http://traefik.traefik.svc.cluster.local:80
+      - service: http_status:404
