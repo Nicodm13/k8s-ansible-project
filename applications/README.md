@@ -29,9 +29,3 @@ For Traefik ingress, use:
 ```yaml
 ingressClassName: traefik
 ```
-
-Traefik is exposed internally in the cluster and public traffic is expected to arrive through Cloudflare Tunnel:
-
-```text
-Cloudflare -> cloudflared -> Traefik -> application
-```
