@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: hello-world
-          image: ghcr.io/nicodm13/k8s-ansible-project/hello-world:latest
+          image: ghcr.io/nicodm13/k8s-ansible-project/hello-world:9b94a5345c87e0c84a6e2f0b41f8688e2d301dbd
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
