@@ -1,8 +1,8 @@
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
-  name: hello-world
-  namespace: hello-world
+  name: main
+  namespace: main
 spec:
   ingressClassName: traefik
   rules:
@@ -12,6 +12,6 @@ spec:
             pathType: Prefix
             backend:
               service:
-                name: hello-world
+                name: main
                 port:
                   name: http

@@ -1,4 +1,4 @@
-name: Build Hello World Image
+name: Build Main Application Image
 
 on:
   workflow_dispatch:
@@ -6,15 +6,15 @@ on:
     branches:
       - main
     paths:
-      - "applications/hello-world/app/**"
-      - ".github/workflows/hello-world-image.yml"
+      - "applications/main/app/**"
+      - ".github/workflows/main-application-image.yml"
 
 permissions:
   contents: write
   packages: write
 
 concurrency:
-  group: hello-world-image
+  group: main-application-image
   cancel-in-progress: false
 
 jobs:
@@ -23,8 +23,8 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      IMAGE_NAME: ghcr.io/nicodm13/k8s-ansible-project/hello-world
-      DEPLOYMENT_FILE: applications/hello-world/deployment.yaml
+      IMAGE_NAME: ghcr.io/nicodm13/k8s-ansible-project/main
+      DEPLOYMENT_FILE: applications/main/deployment.yaml
 
     steps:
       - name: Check out repository
@@ -40,7 +40,7 @@ jobs:
       - name: Build and push image
         uses: docker/build-push-action@v6
         with:
-          context: applications/hello-world/app
+          context: applications/main/app
           push: true
           tags: |
             ${{ env.IMAGE_NAME }}:${{ github.sha }}
@@ -71,5 +71,5 @@ jobs:
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
           git add "$DEPLOYMENT_FILE"
-          git commit -m "Deploy hello-world image ${GITHUB_SHA}"
+          git commit -m "Deploy main application image ${GITHUB_SHA}"
           git push
