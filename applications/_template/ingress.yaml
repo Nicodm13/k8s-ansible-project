@@ -6,7 +6,7 @@ metadata:
 spec:
   ingressClassName: traefik
   rules:
-    - host: app-name.mydomain.dk
+    - host: app-name.kvikit.dk
       http:
         paths:
           - path: /
