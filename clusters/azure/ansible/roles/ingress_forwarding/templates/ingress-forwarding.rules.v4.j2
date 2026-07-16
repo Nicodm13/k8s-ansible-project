@@ -1,10 +1,13 @@
 *nat
 :INGRESS_FORWARDING - [0:0]
+:INGRESS_FORWARDING_LOCAL - [0:0]
 
 -A PREROUTING -p tcp -j INGRESS_FORWARDING
--A OUTPUT -p tcp -o lo -j INGRESS_FORWARDING
+-A OUTPUT -p tcp -d 127.0.0.1/32 -j INGRESS_FORWARDING_LOCAL
+-A OUTPUT -p tcp -d {{ ansible_default_ipv4.address }}/32 -j INGRESS_FORWARDING_LOCAL
 {% for rule in ingress_forwarding_rules %}
 -A INGRESS_FORWARDING -p tcp --dport {{ rule.listen_port }} -j REDIRECT --to-ports {{ rule.target_port }}
+-A INGRESS_FORWARDING_LOCAL -p tcp --dport {{ rule.listen_port }} -j DNAT --to-destination {{ ansible_default_ipv4.address }}:{{ rule.target_port }}
 {% endfor %}
 
 COMMIT
