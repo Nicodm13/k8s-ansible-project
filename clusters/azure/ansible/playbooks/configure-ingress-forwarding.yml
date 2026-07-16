@@ -1,0 +1,8 @@
+---
+- name: Configure ingress port forwarding
+  hosts: controlnode
+  gather_facts: true
+  become: true
+
+  roles:
+    - ingress_forwarding

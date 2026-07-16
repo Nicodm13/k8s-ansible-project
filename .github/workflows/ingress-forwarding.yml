@@ -1,0 +1,51 @@
+name: Configure Ingress Forwarding
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "clusters/azure/ansible/playbooks/configure-ingress-forwarding.yml"
+      - "clusters/azure/ansible/roles/ingress_forwarding/**"
+      - ".github/workflows/ingress-forwarding.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ingress-forwarding
+  cancel-in-progress: false
+
+jobs:
+  configure:
+    name: Configure ingress forwarding
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+
+    env:
+      ANSIBLE_CONFIG: ${{ github.workspace }}/clusters/azure/ansible.cfg
+      ANSIBLE_PLAYBOOK: /opt/automation/venvs/kubespray-current/bin/ansible-playbook
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Verify Ansible runtime
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          test -x "$ANSIBLE_PLAYBOOK"
+          "$ANSIBLE_PLAYBOOK" --version
+
+      - name: Configure ingress forwarding
+        shell: bash
+        working-directory: clusters/azure
+        run: |
+          set -euo pipefail
+
+          "$ANSIBLE_PLAYBOOK" \
+            ansible/playbooks/configure-ingress-forwarding.yml

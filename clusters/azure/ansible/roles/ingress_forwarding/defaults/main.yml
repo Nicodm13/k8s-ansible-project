@@ -1,0 +1,11 @@
+---
+ingress_forwarding_rules:
+  - name: http
+    listen_port: 80
+    target_port: 30080
+  - name: https
+    listen_port: 443
+    target_port: 30443
+
+ingress_forwarding_rules_file: /etc/iptables/ingress-forwarding.rules.v4
+ingress_forwarding_service_name: ingress-forwarding

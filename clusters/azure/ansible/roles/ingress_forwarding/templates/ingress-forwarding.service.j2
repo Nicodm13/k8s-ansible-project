@@ -1,0 +1,21 @@
+[Unit]
+Description=Ingress port forwarding to Kubernetes NodePorts
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStartPre=-/usr/sbin/iptables -t nat -D PREROUTING -p tcp -j INGRESS_FORWARDING
+ExecStartPre=-/usr/sbin/iptables -t nat -D OUTPUT -p tcp -o lo -j INGRESS_FORWARDING
+ExecStartPre=-/usr/sbin/iptables -t nat -F INGRESS_FORWARDING
+ExecStartPre=-/usr/sbin/iptables -t nat -X INGRESS_FORWARDING
+ExecStart=/usr/sbin/iptables-restore --noflush {{ ingress_forwarding_rules_file }}
+ExecReload=-/usr/sbin/iptables -t nat -D PREROUTING -p tcp -j INGRESS_FORWARDING
+ExecReload=-/usr/sbin/iptables -t nat -D OUTPUT -p tcp -o lo -j INGRESS_FORWARDING
+ExecReload=-/usr/sbin/iptables -t nat -F INGRESS_FORWARDING
+ExecReload=-/usr/sbin/iptables -t nat -X INGRESS_FORWARDING
+ExecReload=/usr/sbin/iptables-restore --noflush {{ ingress_forwarding_rules_file }}
+
+[Install]
+WantedBy=multi-user.target

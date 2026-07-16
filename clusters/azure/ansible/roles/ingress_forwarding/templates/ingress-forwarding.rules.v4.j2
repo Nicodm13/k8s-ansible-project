@@ -1,0 +1,10 @@
+*nat
+:INGRESS_FORWARDING - [0:0]
+
+-A PREROUTING -p tcp -j INGRESS_FORWARDING
+-A OUTPUT -p tcp -o lo -j INGRESS_FORWARDING
+{% for rule in ingress_forwarding_rules %}
+-A INGRESS_FORWARDING -p tcp --dport {{ rule.listen_port }} -j REDIRECT --to-ports {{ rule.target_port }}
+{% endfor %}
+
+COMMIT
