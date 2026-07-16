@@ -30,9 +30,8 @@ For Traefik ingress, use:
 ingressClassName: traefik
 ```
 
-Current Traefik entrypoint is exposed by NodePort:
+Traefik is exposed internally in the cluster and public traffic is expected to arrive through Cloudflare Tunnel:
 
 ```text
-HTTP  -> 30080
-HTTPS -> 30443
+Cloudflare -> cloudflared -> Traefik -> application
 ```
