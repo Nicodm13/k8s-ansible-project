@@ -36,8 +36,8 @@ spec:
 
     service:
       enabled: true
-      type: NodePort
       spec:
+        type: NodePort
         externalTrafficPolicy: Cluster
 
     ingressClass:
