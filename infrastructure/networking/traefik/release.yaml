@@ -40,6 +40,9 @@ spec:
     providers:
       kubernetesIngress:
         enabled: true
+    
+    nodeSelector:
+      kubernetes.io/hostname: controlnode
 
     ports:
       web:
