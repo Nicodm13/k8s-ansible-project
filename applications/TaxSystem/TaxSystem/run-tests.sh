@@ -32,6 +32,11 @@ for arg in "$@"; do
   esac
 done
 
+if [ "$USER" = "root" ]; then
+  echo "⚠ ERROR: Do not run this script as root. Use a normal user account."
+  exit 1
+fi
+
 echo ""
 echo "========================================"
 echo "  TaxSystem Test Runner"
