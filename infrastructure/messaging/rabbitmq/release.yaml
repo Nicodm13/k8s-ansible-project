@@ -28,6 +28,10 @@ spec:
       retries: 3
 
   values:
+    global:
+      security:
+        allowInsecureImages: true
+
     image:
       registry: docker.io
       repository: bitnamilegacy/rabbitmq
