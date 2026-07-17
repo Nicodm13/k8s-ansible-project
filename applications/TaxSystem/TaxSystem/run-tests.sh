@@ -15,6 +15,15 @@
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
+case "$SCRIPT_DIR" in
+  /mnt/*|/media/*)
+    echo "ERROR: Run this script from the WSL filesystem, not from $SCRIPT_DIR."
+    echo "Copy the project under ~/src and run it there; .NET must set Unix file"
+    echo "permissions for apphost files, which Windows-mounted paths do not support."
+    exit 1
+    ;;
+esac
+
 SKIP_UNIT=false
 SKIP_E2E=false
 NO_BUILD=false
