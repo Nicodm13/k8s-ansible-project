@@ -1,4 +1,4 @@
-name: Test TaxSystem
+name: Run Tests
 
 on:
   workflow_dispatch:
@@ -18,8 +18,22 @@ permissions:
 
 jobs:
   test:
-    name: Run TaxSystem tests
+    name: Run tests
     runs-on: ubuntu-latest
+
+    services:
+      rabbitmq:
+        image: rabbitmq:3.13-management-alpine
+        ports:
+          - 5672:5672
+        env:
+          RABBITMQ_DEFAULT_USER: taxsystem
+          RABBITMQ_DEFAULT_PASS: taxsystem-password
+        options: >-
+          --health-cmd "rabbitmq-diagnostics -q ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
 
     steps:
       - name: Check out repository
@@ -32,6 +46,12 @@ jobs:
 
       - name: Run tests
         shell: bash
+        env:
+          RABBITMQ_PASSWORD: taxsystem-password
+          RABBITMQ_USERNAME: taxsystem
+          RABBITMQ_HOST: localhost
+          RABBITMQ_PORT: "5672"
+          RUN_RABBITMQ_TESTS: "true"
         run: |
           set -euo pipefail
 
