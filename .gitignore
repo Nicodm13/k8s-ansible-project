@@ -1,3 +1,25 @@
+# Root-local IDE state
+.vs/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Local environment and secrets
+.env
+.env.*
+secrets/
+*.pem
+*.key
+*.p12
+*.pfx
+*.kubeconfig
+admin.conf
+
+# Ansible temporary files
+*.retry
+.ansible/
 
 # Kubespray-generated credentials
 /clusters/azure/kubespray/inventory/*/credentials/
+artifacts/

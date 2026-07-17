@@ -1,0 +1,18 @@
+# Visual Studio / Rider / VS Code
+.vs/
+.idea/
+.vscode/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+
+# .NET build output
+bin/
+obj/
+TestResults/
+*.nupkg
+*.snupkg
+
+# Reqnroll / SpecFlow generated files
+*.feature.cs
