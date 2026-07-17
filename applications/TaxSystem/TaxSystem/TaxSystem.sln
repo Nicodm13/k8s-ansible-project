@@ -14,6 +14,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.CitizenService", 
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.Client", "TaxSystem.Client\TaxSystem.Client.csproj", "{507D928F-82C3-47D4-8D6A-1EE7755916AE}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.CompanyService", "TaxSystem.CompanyService\TaxSystem.CompanyService.csproj", "{14208628-D743-4A85-BA76-B13E71A95734}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -48,5 +50,9 @@ Global
 		{507D928F-82C3-47D4-8D6A-1EE7755916AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{507D928F-82C3-47D4-8D6A-1EE7755916AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{507D928F-82C3-47D4-8D6A-1EE7755916AE}.Release|Any CPU.Build.0 = Release|Any CPU
+		{14208628-D743-4A85-BA76-B13E71A95734}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{14208628-D743-4A85-BA76-B13E71A95734}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{14208628-D743-4A85-BA76-B13E71A95734}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{14208628-D743-4A85-BA76-B13E71A95734}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
