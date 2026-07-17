@@ -27,11 +27,11 @@ public sealed class MessageQueueTests
     {
         if (Environment.GetEnvironmentVariable("RUN_RABBITMQ_TESTS") != "true")
         {
-            Assert.Ignore("Set RUN_RABBITMQ_TESTS=true and run RabbitMQ on localhost to execute this test.");
+            Assert.Ignore("Set RUN_RABBITMQ_TESTS=true and configure RABBITMQ_* variables to execute this test.");
         }
 
         var topic = $"TaxSystem.Test.{Guid.NewGuid():N}";
-        using var queue = new RabbitMqQueue();
+        using var queue = new RabbitMqQueue(RabbitMqOptions.FromEnvironment());
         using var receivedSignal = new ManualResetEventSlim();
         Event? received = null;
 

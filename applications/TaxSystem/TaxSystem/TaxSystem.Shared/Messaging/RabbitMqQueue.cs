@@ -15,7 +15,7 @@ public sealed class RabbitMqQueue : IMessageQueue, IDisposable
     private readonly List<IModel> consumerChannels = [];
 
     public RabbitMqQueue()
-        : this(new RabbitMqOptions())
+        : this(RabbitMqOptions.FromEnvironment())
     {
     }
 
@@ -31,6 +31,7 @@ public sealed class RabbitMqQueue : IMessageQueue, IDisposable
         var factory = new ConnectionFactory
         {
             HostName = options.HostName,
+            Port = options.Port,
             UserName = options.UserName,
             Password = options.Password,
             VirtualHost = options.VirtualHost
