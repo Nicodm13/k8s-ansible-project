@@ -2,7 +2,7 @@ using TaxSystem.Shared.Models;
 
 namespace TaxSystem.Client.Services;
 
-public class GovernmentService
+public class AuditService
 {
     public Audit GetCitizenAuditByCprAndYear(string cpr, string year)
     {

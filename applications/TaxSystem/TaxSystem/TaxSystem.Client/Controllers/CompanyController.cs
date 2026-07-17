@@ -43,4 +43,12 @@ public class CompanyController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, "Failed to fetch company info.");
         }
     }
+
+    [HttpPost("{cvr}/employees/income/{year}/{cpr}")]
+    public ActionResult SetEmployeeIncomeForYear(string cvr, int year, int cpr, [FromBody] int income)
+    {
+        //post income as an integer for a given year and pass it on to the TaxInfoService
+        throw new NotImplementedException();
+    }
+
 }
