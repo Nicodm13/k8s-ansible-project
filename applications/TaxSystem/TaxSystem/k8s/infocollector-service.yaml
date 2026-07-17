@@ -1,0 +1,37 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: infocollector-service
+  labels:
+    app: infocollector-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: infocollector-service
+  template:
+    metadata:
+      labels:
+        app: infocollector-service
+    spec:
+      containers:
+        - name: infocollector-service
+          image: taxsystem-infocollector-service:latest
+          imagePullPolicy: Never
+          env:
+            - name: RABBITMQ_HOST
+              value: "rabbitmq"
+            - name: RABBITMQ_PORT
+              value: "5672"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: infocollector-service
+spec:
+  selector:
+    app: infocollector-service
+  ports:
+    - port: 80
+      targetPort: 8080
+

@@ -1,5 +1,6 @@
 Feature: Report Salary
 
+  @unit @e2e
   Scenario: Company reporting salary of a citizen
     Given a company with CVR "12345678"
     And an employee named "John Doe" with CPR "010101-1234"

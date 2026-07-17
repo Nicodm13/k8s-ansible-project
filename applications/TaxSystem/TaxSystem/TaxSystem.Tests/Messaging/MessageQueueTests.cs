@@ -6,6 +6,7 @@ namespace TaxSystem.Tests.Messaging;
 public sealed class MessageQueueTests
 {
     [Test]
+    [Category("unit")]
     public void SyncQueuePublishesEventToMatchingHandler()
     {
         var queue = new MessageQueueSync();
@@ -23,12 +24,9 @@ public sealed class MessageQueueTests
     }
 
     [Test]
+    [Category("e2e")]
     public void RabbitMqQueuePublishesEventToMatchingHandler()
     {
-        if (Environment.GetEnvironmentVariable("RUN_RABBITMQ_TESTS") != "true")
-        {
-            Assert.Ignore("Set RUN_RABBITMQ_TESTS=true and configure RABBITMQ_* variables to execute this test.");
-        }
 
         var topic = $"TaxSystem.Test.{Guid.NewGuid():N}";
         using var queue = new RabbitMqQueue(RabbitMqOptions.FromEnvironment());

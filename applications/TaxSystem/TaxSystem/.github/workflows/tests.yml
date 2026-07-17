@@ -1,0 +1,145 @@
+name: TaxSystem Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths:
+      - 'applications/TaxSystem/**'
+  pull_request:
+    branches: [ main, develop ]
+    paths:
+      - 'applications/TaxSystem/**'
+  workflow_dispatch:
+
+env:
+  DOTNET_VERSION: '10.0.x'
+  SOLUTION_DIR: applications/TaxSystem/TaxSystem
+
+jobs:
+  unit-tests:
+    name: Unit Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Restore dependencies
+        working-directory: ${{ env.SOLUTION_DIR }}
+        run: dotnet restore
+
+      - name: Build
+        working-directory: ${{ env.SOLUTION_DIR }}
+        run: dotnet build --no-restore
+
+      - name: Run unit tests
+        working-directory: ${{ env.SOLUTION_DIR }}
+        run: dotnet test --no-build --filter "Category=unit" --logger "trx;LogFileName=unit-results.trx"
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-results
+          path: ${{ env.SOLUTION_DIR }}/**/TestResults/*.trx
+
+  e2e-tests:
+    name: E2E Tests (Minikube)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: ${{ env.DOTNET_VERSION }}
+
+      - name: Start Minikube
+        uses: medyagh/setup-minikube@latest
+        with:
+          minikube-version: 'latest'
+          driver: docker
+
+      - name: Build Docker images inside Minikube
+        working-directory: ${{ env.SOLUTION_DIR }}
+        run: |
+          eval $(minikube docker-env)
+          docker build -f TaxSystem.Client/Dockerfile -t taxsystem-client:latest .
+          docker build -f TaxSystem.CitizenService/Dockerfile -t taxsystem-citizen-service:latest .
+          docker build -f TaxSystem.CompanyService/Dockerfile -t taxsystem-company-service:latest .
+          docker build -f TaxSystem.AuditService/Dockerfile -t taxsystem-audit-service:latest .
+          docker build -f TaxSystem.InfoCollectorService/Dockerfile -t taxsystem-infocollector-service:latest .
+          docker build -f TaxSystem.StatementGeneratorService/Dockerfile -t taxsystem-statementgenerator-service:latest .
+
+      - name: Deploy to Minikube
+        working-directory: ${{ env.SOLUTION_DIR }}
+        run: |
+          kubectl apply -f k8s/rabbitmq.yaml
+          kubectl apply -f k8s/citizen-service.yaml
+          kubectl apply -f k8s/company-service.yaml
+          kubectl apply -f k8s/audit-service.yaml
+          kubectl apply -f k8s/infocollector-service.yaml
+          kubectl apply -f k8s/statementgenerator-service.yaml
+          kubectl apply -f k8s/client.yaml
+
+      - name: Wait for RabbitMQ to be ready
+        run: |
+          kubectl wait --for=condition=ready pod -l app=rabbitmq --timeout=120s
+
+      - name: Wait for Client to be ready
+        run: |
+          kubectl wait --for=condition=ready pod -l app=client --timeout=120s || true
+
+      - name: Get Client service URL
+        id: client-url
+        run: |
+          CLIENT_URL=$(minikube service client --url)
+          echo "CLIENT_BASE_URL=$CLIENT_URL" >> $GITHUB_ENV
+          echo "Client URL: $CLIENT_URL"
+
+      - name: Get RabbitMQ connection info
+        run: |
+          RABBITMQ_URL=$(minikube service rabbitmq --url --format={{.IP}}:{{.Port}} | head -1)
+          RABBITMQ_HOST=$(echo $RABBITMQ_URL | cut -d: -f1)
+          RABBITMQ_PORT=$(echo $RABBITMQ_URL | cut -d: -f2)
+          echo "RABBITMQ_HOST=$RABBITMQ_HOST" >> $GITHUB_ENV
+          echo "RABBITMQ_PORT=$RABBITMQ_PORT" >> $GITHUB_ENV
+
+      - name: Restore dependencies
+        working-directory: ${{ env.SOLUTION_DIR }}
+        run: dotnet restore
+
+      - name: Build
+        working-directory: ${{ env.SOLUTION_DIR }}
+        run: dotnet build --no-restore
+
+      - name: Run E2E tests
+        working-directory: ${{ env.SOLUTION_DIR }}
+        env:
+          CLIENT_BASE_URL: ${{ env.CLIENT_BASE_URL }}
+          RABBITMQ_HOST: ${{ env.RABBITMQ_HOST }}
+          RABBITMQ_PORT: ${{ env.RABBITMQ_PORT }}
+          RABBITMQ_USERNAME: guest
+          RABBITMQ_PASSWORD: guest
+        run: dotnet test --no-build --filter "Category=e2e" --logger "trx;LogFileName=e2e-results.trx"
+
+      - name: Dump pod logs on failure
+        if: failure()
+        run: |
+          echo "=== Pod Status ==="
+          kubectl get pods
+          echo "=== Client Logs ==="
+          kubectl logs -l app=client --tail=50 || true
+          echo "=== RabbitMQ Logs ==="
+          kubectl logs -l app=rabbitmq --tail=50 || true
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-results
+          path: ${{ env.SOLUTION_DIR }}/**/TestResults/*.trx
+
