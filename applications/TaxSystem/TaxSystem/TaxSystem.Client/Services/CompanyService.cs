@@ -20,4 +20,14 @@ public class CompanyService
     {
         _taxInfoService.setIncomeByCprAndYear(income, cpr, year, $"Company-{cvr}");
     }
+
+    public void RegisterCompany(Company company)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void UpdateCompany(Company? company)
+    {
+        throw new NotImplementedException();
+    }
 }

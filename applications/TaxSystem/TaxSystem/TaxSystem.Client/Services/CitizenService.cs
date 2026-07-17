@@ -26,6 +26,26 @@ public class CitizenService
     {
         _taxInfoService.setDeductiblesByCprAndYear(deductibles, citizenId, year, "CitizenReport");
     }
+    
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="citizen"></param>
+    /// <exception cref="InvalidOperationException">thrown if attempting to create a citizen that already exists</exception>
+    public void createCitizen(Citizen citizen)
+    {
+        throw new NotImplementedException();
+    }
+
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="citizen"></param>
+    /// <exception cref="NotImplementedException"></exception>
+    public void updateCitizen(Citizen? citizen)
+    {
+        throw new NotImplementedException();
+    }
 }
 
 

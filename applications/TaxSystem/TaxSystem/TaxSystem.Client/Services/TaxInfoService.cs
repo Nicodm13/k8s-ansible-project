@@ -14,7 +14,7 @@ public class TaxInfoService
         throw new NotImplementedException();
     }
 
-    public void getCitizenStatementByCprAndYear(string cpr, int year)
+    public void getNewestTaxStatementByCprAndYear(string cpr, int year)
     {
         throw new NotImplementedException();
     }

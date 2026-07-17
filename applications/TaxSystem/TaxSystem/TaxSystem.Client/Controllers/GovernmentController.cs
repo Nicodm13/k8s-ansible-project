@@ -9,10 +9,43 @@ using Microsoft.AspNetCore.Mvc;
 public class GovernmentController : ControllerBase
 {
     private readonly AuditService _auditService;
+    private readonly CitizenService _citizenService;
+    private readonly CompanyService _companyService;
 
-    public GovernmentController(AuditService auditService)
+    public GovernmentController(AuditService auditService,  CitizenService citizenService, CompanyService companyservice)
     {
         _auditService = auditService;
+        _citizenService = citizenService;
+        _companyService = companyservice;
+    }
+
+    [HttpPost("Citizens/{cpr}")]
+    public ActionResult RegisterCitizen(Citizen citizen)
+    {
+        try
+        {
+            _citizenService.createCitizen(citizen);
+            return Ok("Citizen registered successfully.");
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create Citizen.");
+        }
+    }
+
+    [HttpPost("Companies/{cvr}")]
+    public ActionResult RegisterCompany(Company company)
+    {
+        try
+        {
+            _companyService.RegisterCompany(company);
+            return Ok("Company registered successfully.");
+        }
+        catch (Exception e)
+        {
+            Console.WriteLine(e);
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create Citizen.");
+        }
     }
 
     [HttpGet("Audits/Citizens/{cpr}")]
