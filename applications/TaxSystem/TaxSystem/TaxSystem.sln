@@ -4,8 +4,6 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.Shared", "TaxSyst
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.StatementGeneratorService", "TaxSystem.StatementGeneratorService\TaxSystem.StatementGeneratorService.csproj", "{D115BE91-05E5-44C8-9A7F-2DD6A4A5FAB7}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.Client", "TaxSystem.Client\TaxSystem.Client.csproj", "{FEA93378-F857-4035-9A96-67E33721748F}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.InfoCollectorService", "TaxSystem.InfoCollectorService\TaxSystem.InfoCollectorService.csproj", "{6FF9C31A-366D-43EE-A7B4-DE74462198F9}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.AuditService", "TaxSystem.AuditService\TaxSystem.AuditService.csproj", "{72D4A59A-84F3-4A26-A9AC-5D57C66FC693}"
@@ -13,6 +11,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.Tests", "TaxSystem.Tests\TaxSystem.Tests.csproj", "{7451413C-D4EB-485C-A2E7-66436D66BE76}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.CitizenService", "TaxSystem.CitizenService\TaxSystem.CitizenService.csproj", "{18E6CDF6-CE1C-4DD6-90C3-B0536519633D}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.Client", "TaxSystem.Client\TaxSystem.Client.csproj", "{507D928F-82C3-47D4-8D6A-1EE7755916AE}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -28,10 +28,6 @@ Global
 		{D115BE91-05E5-44C8-9A7F-2DD6A4A5FAB7}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{D115BE91-05E5-44C8-9A7F-2DD6A4A5FAB7}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{D115BE91-05E5-44C8-9A7F-2DD6A4A5FAB7}.Release|Any CPU.Build.0 = Release|Any CPU
-		{FEA93378-F857-4035-9A96-67E33721748F}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{FEA93378-F857-4035-9A96-67E33721748F}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{FEA93378-F857-4035-9A96-67E33721748F}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{FEA93378-F857-4035-9A96-67E33721748F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6FF9C31A-366D-43EE-A7B4-DE74462198F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{6FF9C31A-366D-43EE-A7B4-DE74462198F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{6FF9C31A-366D-43EE-A7B4-DE74462198F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -48,5 +44,9 @@ Global
 		{18E6CDF6-CE1C-4DD6-90C3-B0536519633D}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{18E6CDF6-CE1C-4DD6-90C3-B0536519633D}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{18E6CDF6-CE1C-4DD6-90C3-B0536519633D}.Release|Any CPU.Build.0 = Release|Any CPU
+		{507D928F-82C3-47D4-8D6A-1EE7755916AE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{507D928F-82C3-47D4-8D6A-1EE7755916AE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{507D928F-82C3-47D4-8D6A-1EE7755916AE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{507D928F-82C3-47D4-8D6A-1EE7755916AE}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
