@@ -8,11 +8,11 @@ using Microsoft.AspNetCore.Mvc;
 [Route("Government")]
 public class GovernmentController : ControllerBase
 {
-    private readonly GovernmentService _governmentService;
+    private readonly AuditService _auditService;
 
-    public GovernmentController(GovernmentService governmentService)
+    public GovernmentController(AuditService auditService)
     {
-        _governmentService = governmentService;
+        _auditService = auditService;
     }
 
     [HttpGet("Audits/Citizens/{cpr}")]
@@ -25,7 +25,7 @@ public class GovernmentController : ControllerBase
 
         try
         {
-            var audits = _governmentService.GetCitizenAuditsByCpr(cpr);
+            var audits = _auditService.GetCitizenAuditsByCpr(cpr);
             return Ok(audits);
         }
         catch (NotImplementedException)
@@ -48,7 +48,7 @@ public class GovernmentController : ControllerBase
 
         try
         {
-            var audit = _governmentService.GetCitizenAuditByCprAndYear(cpr, year);
+            var audit = _auditService.GetCitizenAuditByCprAndYear(cpr, year);
             return Ok(audit);
         }
         catch (NotImplementedException)

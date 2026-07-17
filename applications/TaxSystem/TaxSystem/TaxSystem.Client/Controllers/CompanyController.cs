@@ -43,4 +43,28 @@ public class CompanyController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, "Failed to fetch company info.");
         }
     }
+
+    [HttpPost("{cvr}/employees/income/{year}/{cpr}")]
+    public ActionResult SetEmployeeIncomeForYear(string cvr, int year, int cpr, [FromBody] int income)
+    {
+        if (string.IsNullOrWhiteSpace(cvr) || year <= 0 || cpr <= 0 || income < 0)
+        {
+            return BadRequest("CVR, year, CPR, and income must be valid.");
+        }
+
+        try
+        {
+            _companyService.SetEmployeeIncomeForYear(cvr, year, cpr, income);
+            return Ok("Employee income reported successfully.");
+        }
+        catch (NotImplementedException)
+        {
+            return StatusCode(StatusCodes.Status501NotImplemented, "Employee income reporting is not implemented yet.");
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to report employee income.");
+        }
+    }
+
 }
