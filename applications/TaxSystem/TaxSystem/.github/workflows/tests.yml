@@ -63,16 +63,27 @@ jobs:
           minikube-version: 'latest'
           driver: docker
 
-      - name: Build Docker images inside Minikube
+      - name: Build solution and publish services
+        working-directory: ${{ env.SOLUTION_DIR }}
+        run: |
+          dotnet build TaxSystem.sln --configuration Release
+          for proj in TaxSystem.Client TaxSystem.CitizenService TaxSystem.CompanyService \
+                      TaxSystem.AuditService TaxSystem.InfoCollectorService TaxSystem.StatementGeneratorService; do
+            dotnet publish "$proj/$proj.csproj" --configuration Release --no-build \
+              -o "publish/$proj" /p:UseAppHost=false
+          done
+
+      - name: Build Docker images inside Minikube (parallel)
         working-directory: ${{ env.SOLUTION_DIR }}
         run: |
           eval $(minikube docker-env)
-          docker build -f TaxSystem.Client/Dockerfile -t taxsystem-client:latest .
-          docker build -f TaxSystem.CitizenService/Dockerfile -t taxsystem-citizen-service:latest .
-          docker build -f TaxSystem.CompanyService/Dockerfile -t taxsystem-company-service:latest .
-          docker build -f TaxSystem.AuditService/Dockerfile -t taxsystem-audit-service:latest .
-          docker build -f TaxSystem.InfoCollectorService/Dockerfile -t taxsystem-infocollector-service:latest .
-          docker build -f TaxSystem.StatementGeneratorService/Dockerfile -t taxsystem-statementgenerator-service:latest .
+          docker build -q -f TaxSystem.Client/Dockerfile -t taxsystem-client:latest . &
+          docker build -q -f TaxSystem.CitizenService/Dockerfile -t taxsystem-citizen-service:latest . &
+          docker build -q -f TaxSystem.CompanyService/Dockerfile -t taxsystem-company-service:latest . &
+          docker build -q -f TaxSystem.AuditService/Dockerfile -t taxsystem-audit-service:latest . &
+          docker build -q -f TaxSystem.InfoCollectorService/Dockerfile -t taxsystem-infocollector-service:latest . &
+          docker build -q -f TaxSystem.StatementGeneratorService/Dockerfile -t taxsystem-statementgenerator-service:latest . &
+          wait
 
       - name: Deploy to Minikube
         working-directory: ${{ env.SOLUTION_DIR }}

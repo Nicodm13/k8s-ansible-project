@@ -52,14 +52,39 @@ echo "  TaxSystem Test Runner"
 echo "========================================"
 echo ""
 
-# ─── Step 1: Build ───────────────────────────────────────────────────────────
+# ─── Step 1: Build & Publish ─────────────────────────────────────────────────
+
+PUBLISH_DIR="$SCRIPT_DIR/publish"
+
+PUBLISH_PROJECTS=(
+  TaxSystem.Client
+  TaxSystem.CitizenService
+  TaxSystem.CompanyService
+  TaxSystem.AuditService
+  TaxSystem.InfoCollectorService
+  TaxSystem.StatementGeneratorService
+)
 
 if [ "$NO_BUILD" = false ]; then
-  echo "[1/7] Building solution..."
+  echo "[1/7] Building solution and publishing services..."
+
+  # Single solution build
   if ! dotnet build "$SCRIPT_DIR/TaxSystem.sln" --configuration Release; then
     echo "✗ BUILD FAILED"; exit 1
   fi
-  echo "✓ Build succeeded."
+
+  # Publish each service (--no-build reuses the build above)
+  rm -rf "$PUBLISH_DIR"
+  for proj in "${PUBLISH_PROJECTS[@]}"; do
+    echo "  Publishing $proj..."
+    if ! dotnet publish "$SCRIPT_DIR/$proj/$proj.csproj" \
+      --configuration Release --no-build \
+      -o "$PUBLISH_DIR/$proj" /p:UseAppHost=false; then
+      echo "✗ PUBLISH FAILED: $proj"; exit 1
+    fi
+  done
+
+  echo "✓ Build & publish succeeded."
 else
   echo "[1/7] Skipping build (--no-build)."
 fi
@@ -97,7 +122,7 @@ if ! minikube status --format='{{.Host}}' 2>/dev/null | grep -q "Running"; then
 fi
 echo "✓ Minikube is running."
 
-# ─── Step 4: Build Docker images inside Minikube ─────────────────────────────
+# ─── Step 4: Build Docker images inside Minikube (parallel) ──────────────────
 
 echo ""
 echo "[4/7] Building Docker images inside Minikube..."
@@ -113,15 +138,30 @@ declare -A SERVICES=(
   ["taxsystem-statementgenerator-service"]="TaxSystem.StatementGeneratorService/Dockerfile"
 )
 
+BUILD_PIDS=()
+BUILD_NAMES=()
+BUILD_FAILED=false
+
 for name in "${!SERVICES[@]}"; do
   dockerfile="${SERVICES[$name]}"
-  echo "  Building $name..."
-  if ! docker build -f "$SCRIPT_DIR/$dockerfile" -t "$name:latest" "$SCRIPT_DIR"; then
-    echo "✗ DOCKER BUILD FAILED: $name"; exit 1
+  echo "  Starting build: $name"
+  docker build -q -f "$SCRIPT_DIR/$dockerfile" -t "$name:latest" "$SCRIPT_DIR" &
+  BUILD_PIDS+=($!)
+  BUILD_NAMES+=("$name")
+done
+
+for i in "${!BUILD_PIDS[@]}"; do
+  if ! wait "${BUILD_PIDS[$i]}"; then
+    echo "✗ DOCKER BUILD FAILED: ${BUILD_NAMES[$i]}"
+    BUILD_FAILED=true
   fi
 done
 
-echo "✓ All images built."
+if [ "$BUILD_FAILED" = true ]; then
+  exit 1
+fi
+
+echo "✓ All images built (parallel)."
 
 # ─── Step 5: Deploy to Minikube ──────────────────────────────────────────────
 
