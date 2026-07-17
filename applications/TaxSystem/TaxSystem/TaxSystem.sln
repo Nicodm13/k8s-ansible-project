@@ -10,6 +10,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.InfoCollectorServ
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.AuditService", "TaxSystem.AuditService\TaxSystem.AuditService.csproj", "{72D4A59A-84F3-4A26-A9AC-5D57C66FC693}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaxSystem.Tests", "TaxSystem.Tests\TaxSystem.Tests.csproj", "{7451413C-D4EB-485C-A2E7-66436D66BE76}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -36,5 +38,9 @@ Global
 		{72D4A59A-84F3-4A26-A9AC-5D57C66FC693}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{72D4A59A-84F3-4A26-A9AC-5D57C66FC693}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{72D4A59A-84F3-4A26-A9AC-5D57C66FC693}.Release|Any CPU.Build.0 = Release|Any CPU
+		{7451413C-D4EB-485C-A2E7-66436D66BE76}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{7451413C-D4EB-485C-A2E7-66436D66BE76}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{7451413C-D4EB-485C-A2E7-66436D66BE76}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{7451413C-D4EB-485C-A2E7-66436D66BE76}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
