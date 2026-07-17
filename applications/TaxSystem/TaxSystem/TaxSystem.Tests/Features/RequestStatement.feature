@@ -1,5 +1,4 @@
-@unit
-Feature: Request Statement (Unit)
+Feature: Request Statement
 
   Scenario: Citizen requests their tax statement
     Given an employee named "John Doe" with CPR "010101-1234"

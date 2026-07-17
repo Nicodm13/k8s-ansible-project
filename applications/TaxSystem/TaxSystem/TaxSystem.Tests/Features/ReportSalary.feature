@@ -1,5 +1,4 @@
-@unit
-Feature: Report Salary (Unit)
+Feature: Report Salary
 
   Scenario: Company reporting salary of a citizen
     Given a company with CVR "12345678"

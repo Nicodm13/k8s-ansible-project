@@ -1,5 +1,4 @@
-@e2e
-Feature: Request Statement (E2E)
+Feature: Request Statement
 
   Scenario: Citizen requests their tax statement
     Given an employee named "John Doe" with CPR "010101-1234"

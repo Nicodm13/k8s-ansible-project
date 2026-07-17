@@ -16,8 +16,8 @@ env:
   SOLUTION_DIR: applications/TaxSystem/TaxSystem
 
 jobs:
-  unit-tests:
-    name: Unit Tests
+  service-tests:
+    name: Service-Level Tests
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -29,21 +29,21 @@ jobs:
 
       - name: Restore dependencies
         working-directory: ${{ env.SOLUTION_DIR }}
-        run: dotnet restore
+        run: dotnet restore TaxSystem.Tests/TaxSystem.Tests.csproj
 
       - name: Build
         working-directory: ${{ env.SOLUTION_DIR }}
-        run: dotnet build --no-restore
+        run: dotnet build TaxSystem.Tests/TaxSystem.Tests.csproj --no-restore
 
-      - name: Run unit tests
+      - name: Run service-level tests
         working-directory: ${{ env.SOLUTION_DIR }}
-        run: dotnet test --no-build --filter "Category=unit" --logger "trx;LogFileName=unit-results.trx"
+        run: dotnet test TaxSystem.Tests/TaxSystem.Tests.csproj --no-build --logger "trx;LogFileName=service-results.trx"
 
       - name: Upload test results
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: unit-test-results
+          name: service-test-results
           path: ${{ env.SOLUTION_DIR }}/**/TestResults/*.trx
 
   e2e-tests:
@@ -110,11 +110,11 @@ jobs:
 
       - name: Restore dependencies
         working-directory: ${{ env.SOLUTION_DIR }}
-        run: dotnet restore
+        run: dotnet restore TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj
 
       - name: Build
         working-directory: ${{ env.SOLUTION_DIR }}
-        run: dotnet build --no-restore
+        run: dotnet build TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj --no-restore
 
       - name: Run E2E tests
         working-directory: ${{ env.SOLUTION_DIR }}
@@ -124,7 +124,7 @@ jobs:
           RABBITMQ_PORT: ${{ env.RABBITMQ_PORT }}
           RABBITMQ_USERNAME: guest
           RABBITMQ_PASSWORD: guest
-        run: dotnet test --no-build --filter "Category=e2e" --logger "trx;LogFileName=e2e-results.trx"
+        run: dotnet test TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj --no-build --logger "trx;LogFileName=e2e-results.trx"
 
       - name: Dump pod logs on failure
         if: failure()
@@ -142,4 +142,3 @@ jobs:
         with:
           name: e2e-test-results
           path: ${{ env.SOLUTION_DIR }}/**/TestResults/*.trx
-
