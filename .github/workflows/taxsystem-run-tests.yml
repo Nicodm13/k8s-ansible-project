@@ -7,6 +7,8 @@ on:
       - "applications/TaxSystem/**"
       - ".github/workflows/taxsystem-run-tests.yml"
   push:
+    branches:
+      - main
     paths:
       - "applications/TaxSystem/**"
       - ".github/workflows/taxsystem-run-tests.yml"
