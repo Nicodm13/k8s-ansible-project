@@ -22,7 +22,11 @@ public sealed class E2EStepDefinitions : IDisposable
     public E2EStepDefinitions()
     {
         var baseUrl = Environment.GetEnvironmentVariable("CLIENT_BASE_URL") ?? "http://localhost:8080";
-        _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
+        _httpClient = new HttpClient
+        {
+            BaseAddress = new Uri(baseUrl),
+            Timeout = TimeSpan.FromSeconds(15)
+        };
     }
 
     [Given(@"a company with CVR ""(.*)""")]

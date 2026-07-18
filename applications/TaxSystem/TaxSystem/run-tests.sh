@@ -197,8 +197,26 @@ if ! kubectl wait --namespace tax-system --for=condition=ready pod -l app=rabbit
 fi
 
 echo "  Waiting for Client..."
-kubectl wait --namespace tax-system --for=condition=ready pod -l app=client --timeout=120s || \
-  echo "  ⚠ Client pod not ready (services may not be implemented yet)"
+if ! kubectl wait --namespace tax-system --for=condition=ready pod -l app=client --timeout=120s; then
+  echo "✗ Client pod did not become ready"
+  kubectl get pods --namespace tax-system
+  kubectl logs --namespace tax-system -l app=client --tail=50 2>/dev/null || true
+  exit 1
+fi
+
+for deployment in \
+  bank-service \
+  citizen-service \
+  company-service \
+  statementgenerator-service; do
+  echo "  Waiting for $deployment..."
+  if ! kubectl wait --namespace tax-system --for=condition=available deployment/$deployment --timeout=120s; then
+    echo "✗ $deployment did not become available"
+    kubectl get pods --namespace tax-system
+    kubectl logs --namespace tax-system -l app=$deployment --tail=50 2>/dev/null || true
+    exit 1
+  fi
+done
 
 echo "✓ Pods ready."
 
@@ -235,8 +253,11 @@ dotnet test "$SCRIPT_DIR/TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj" \
 if [ $? -ne 0 ]; then
   echo ""
   echo "✗ E2E TESTS FAILED"
-  kubectl get pods
-  kubectl logs -l app=client --tail=30 2>/dev/null || true
+  kubectl get pods --namespace tax-system
+  for app in client company-service citizen-service bank-service statementgenerator-service rabbitmq; do
+    echo "--- logs: $app ---"
+    kubectl logs --namespace tax-system -l app=$app --tail=50 2>/dev/null || true
+  done
   exit 1
 fi
 
