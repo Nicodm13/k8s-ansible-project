@@ -23,3 +23,8 @@ admin.conf
 # Kubespray-generated credentials
 /clusters/azure/kubespray/inventory/*/credentials/
 artifacts/
+
+# .NET build outputs
+bin/
+obj/
+publish/
