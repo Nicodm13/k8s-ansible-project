@@ -221,6 +221,33 @@ fi
 
 echo "✓ All pods ready."
 
+echo "  Waiting for MassTransit buses to be connected..."
+for app in client citizen-service company-service bank-service statementgenerator-service; do
+  if ! kubectl wait --for=condition=ready pod -l app="$app" -n tax-system --timeout=15s >/dev/null; then
+    echo "✗ Pod for $app is not ready"
+    exit 1
+  fi
+
+  pod=$(kubectl get pod -l app="$app" -n tax-system -o jsonpath='{.items[0].metadata.name}')
+  bus_ready=false
+  for attempt in {1..30}; do
+    if kubectl logs "$pod" -n tax-system --tail=80 2>/dev/null | grep -q "Bus started:"; then
+      bus_ready=true
+      break
+    fi
+
+    sleep 1
+  done
+
+  if [ "$bus_ready" = false ]; then
+    echo "✗ MassTransit bus did not start for $app"
+    kubectl logs "$pod" -n tax-system --tail=80 2>&1 || true
+    exit 1
+  fi
+done
+
+echo "✓ MassTransit buses connected."
+
 # ─── Step 7: Run E2E tests ───────────────────────────────────────────────────
 
 echo ""
@@ -263,4 +290,3 @@ echo ""
 echo "========================================"
 echo "  ✓ ALL TESTS PASSED"
 echo "========================================"
-

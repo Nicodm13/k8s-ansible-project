@@ -25,7 +25,7 @@ public sealed class E2EStepDefinitions : IDisposable
         _httpClient = new HttpClient
         {
             BaseAddress = new Uri(baseUrl),
-            Timeout = TimeSpan.FromSeconds(15)
+            Timeout = TimeSpan.FromSeconds(30)
         };
     }
 
