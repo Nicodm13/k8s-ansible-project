@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: citizen-service
+  namespace: taxsystem
+  labels:
+    app: citizen-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: citizen-service
+  template:
+    metadata:
+      labels:
+        app: citizen-service
+    spec:
+      containers:
+        - name: citizen-service
+          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-citizen-service:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TAXSYSTEM_DATA_PATH
+              value: "/var/lib/taxsystem"
+            - name: RABBITMQ_HOST
+              value: "rabbitmq.taxsystem.svc.cluster.local"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USERNAME
+              value: "taxsystem"
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq
+                  key: rabbitmq-password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/taxsystem
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: taxsystem-citizen-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: citizen-service
+  namespace: taxsystem
+spec:
+  selector:
+    app: citizen-service
+  ports:
+    - port: 80
+      targetPort: 8080

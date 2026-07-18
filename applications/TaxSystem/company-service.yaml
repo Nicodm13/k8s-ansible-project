@@ -1,0 +1,54 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: company-service
+  namespace: taxsystem
+  labels:
+    app: company-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: company-service
+  template:
+    metadata:
+      labels:
+        app: company-service
+    spec:
+      containers:
+        - name: company-service
+          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-company-service:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: TAXSYSTEM_DATA_PATH
+              value: "/var/lib/taxsystem"
+            - name: RABBITMQ_HOST
+              value: "rabbitmq.taxsystem.svc.cluster.local"
+            - name: RABBITMQ_PORT
+              value: "5672"
+            - name: RABBITMQ_USERNAME
+              value: "taxsystem"
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq
+                  key: rabbitmq-password
+          volumeMounts:
+            - name: data
+              mountPath: /var/lib/taxsystem
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: taxsystem-company-data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: company-service
+  namespace: taxsystem
+spec:
+  selector:
+    app: company-service
+  ports:
+    - port: 80
+      targetPort: 8080

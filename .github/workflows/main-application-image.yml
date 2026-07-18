@@ -1,4 +1,4 @@
-name: Build Main Application Image
+name: Build Application Images
 
 on:
   workflow_dispatch:
@@ -7,6 +7,7 @@ on:
       - main
     paths:
       - "applications/main/app/**"
+      - "applications/TaxSystem/TaxSystem/**"
       - ".github/workflows/main-application-image.yml"
 
 permissions:
@@ -14,21 +15,28 @@ permissions:
   packages: write
 
 concurrency:
-  group: main-application-image
+  group: application-images
   cancel-in-progress: false
 
 jobs:
   build:
-    name: Build and publish image
+    name: Build and publish images
     runs-on: ubuntu-latest
 
     env:
-      IMAGE_NAME: ghcr.io/nicodm13/k8s-ansible-project/main
-      DEPLOYMENT_FILE: applications/main/deployment.yaml
+      REGISTRY_PREFIX: ghcr.io/nicodm13/k8s-ansible-project
+      MAIN_IMAGE_NAME: ghcr.io/nicodm13/k8s-ansible-project/main
+      MAIN_DEPLOYMENT_FILE: applications/main/deployment.yaml
+      TAXSYSTEM_SOLUTION_DIR: applications/TaxSystem/TaxSystem
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -37,39 +45,85 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push image
+      - name: Build and push main image
         uses: docker/build-push-action@v6
         with:
           context: applications/main/app
           push: true
           tags: |
-            ${{ env.IMAGE_NAME }}:${{ github.sha }}
-            ${{ env.IMAGE_NAME }}:latest
+            ${{ env.MAIN_IMAGE_NAME }}:${{ github.sha }}
+            ${{ env.MAIN_IMAGE_NAME }}:latest
 
-      - name: Update Flux manifest image tag
+      - name: Build and publish TaxSystem projects
         shell: bash
         run: |
           set -euo pipefail
 
-          IMAGE="${IMAGE_NAME}:${GITHUB_SHA}"
+          dotnet build "$TAXSYSTEM_SOLUTION_DIR/TaxSystem.sln" --configuration Release
+          rm -rf "$TAXSYSTEM_SOLUTION_DIR/publish"
 
-          sed -i -E "s#image: ${IMAGE_NAME}:[^[:space:]]+#image: ${IMAGE}#" "$DEPLOYMENT_FILE"
+          for project in \
+            TaxSystem.Client \
+            TaxSystem.CitizenService \
+            TaxSystem.CompanyService \
+            TaxSystem.BankService \
+            TaxSystem.StatementGeneratorService; do
+            dotnet publish "$TAXSYSTEM_SOLUTION_DIR/$project/$project.csproj" \
+              --configuration Release --no-build \
+              -o "$TAXSYSTEM_SOLUTION_DIR/publish/$project" /p:UseAppHost=false
+          done
 
-          git diff -- "$DEPLOYMENT_FILE"
-
-      - name: Commit deployment manifest update
+      - name: Build and push TaxSystem images
         shell: bash
         run: |
           set -euo pipefail
 
-          if git diff --quiet -- "$DEPLOYMENT_FILE"; then
-            echo "Deployment manifest already points at this image."
+          declare -A images=(
+            [taxsystem-client]=TaxSystem.Client/Dockerfile
+            [taxsystem-citizen-service]=TaxSystem.CitizenService/Dockerfile
+            [taxsystem-company-service]=TaxSystem.CompanyService/Dockerfile
+            [taxsystem-bank-service]=TaxSystem.BankService/Dockerfile
+            [taxsystem-statementgenerator-service]=TaxSystem.StatementGeneratorService/Dockerfile
+          )
+
+          for image in "${!images[@]}"; do
+            docker build \
+              -f "$TAXSYSTEM_SOLUTION_DIR/${images[$image]}" \
+              -t "$REGISTRY_PREFIX/$image:$GITHUB_SHA" \
+              -t "$REGISTRY_PREFIX/$image:latest" \
+              "$TAXSYSTEM_SOLUTION_DIR"
+
+            docker push "$REGISTRY_PREFIX/$image:$GITHUB_SHA"
+            docker push "$REGISTRY_PREFIX/$image:latest"
+          done
+
+      - name: Update Flux manifest image tags
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          MAIN_IMAGE="${MAIN_IMAGE_NAME}:${GITHUB_SHA}"
+          sed -i -E "s#image: ${MAIN_IMAGE_NAME}:[^[:space:]]+#image: ${MAIN_IMAGE}#" "$MAIN_DEPLOYMENT_FILE"
+
+          for file in applications/TaxSystem/*.yaml; do
+            sed -i -E "s#image: ${REGISTRY_PREFIX}/([^:]+):[^[:space:]]+#image: ${REGISTRY_PREFIX}/\1:${GITHUB_SHA}#" "$file"
+          done
+
+          git diff -- "$MAIN_DEPLOYMENT_FILE" applications/TaxSystem/*.yaml
+
+      - name: Commit deployment manifest updates
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          if git diff --quiet -- "$MAIN_DEPLOYMENT_FILE" applications/TaxSystem/*.yaml; then
+            echo "Deployment manifests already point at this image."
             exit 0
           fi
 
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add "$DEPLOYMENT_FILE"
-          git commit -m "Deploy main application image ${GITHUB_SHA}"
+          git add "$MAIN_DEPLOYMENT_FILE" applications/TaxSystem/*.yaml
+          git commit -m "Deploy application images ${GITHUB_SHA}"
           git push
