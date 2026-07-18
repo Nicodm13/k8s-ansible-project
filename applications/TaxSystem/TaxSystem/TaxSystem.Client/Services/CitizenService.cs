@@ -1,3 +1,5 @@
+using MassTransit;
+using TaxSystem.Shared.Messaging.Contracts;
 using TaxSystem.Shared.Models;
 
 namespace TaxSystem.Client.Services;
@@ -5,10 +7,12 @@ namespace TaxSystem.Client.Services;
 public class CitizenService
 {
     private readonly TaxInfoService _taxInfoService;
+    private readonly IPublishEndpoint _publishEndpoint;
 
-    public CitizenService(TaxInfoService taxInfoService)
+    public CitizenService(TaxInfoService taxInfoService, IPublishEndpoint publishEndpoint)
     {
         _taxInfoService = taxInfoService;
+        _publishEndpoint = publishEndpoint;
     }
 
     public Statement GetStatementByCitizenIdAndYear(int citizenId, int year)
@@ -32,9 +36,18 @@ public class CitizenService
     /// </summary>
     /// <param name="citizen"></param>
     /// <exception cref="InvalidOperationException">thrown if attempting to create a citizen that already exists</exception>
-    public void createCitizen(Citizen citizen)
+    public async Task<Citizen> createCitizen(Citizen citizen)
     {
-        throw new NotImplementedException();
+        await _publishEndpoint.Publish(new CitizenRegistrationRequested(
+            citizen.cpr,
+            citizen.firstName,
+            citizen.lastName,
+            citizen.streetAddress,
+            citizen.city,
+            citizen.zipCode,
+            citizen.bankAccountNumber));
+
+        return citizen;
     }
 
     /// <summary>

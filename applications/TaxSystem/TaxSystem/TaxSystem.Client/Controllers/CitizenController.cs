@@ -106,4 +106,22 @@ public class CitizenController : ControllerBase
             return StatusCode(StatusCodes.Status500InternalServerError, "Failed to report deductibles.");
         }
     }
+
+    [HttpPost]
+    public async Task<IActionResult> RegisterCitizen([FromBody] Citizen citizen)
+    {
+        try
+        {
+            var result = await _citizenService.createCitizen(citizen);
+            return Ok(result);
+        }
+        catch (InvalidOperationException ex)
+        {
+            return Conflict(ex.Message);
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to register citizen.");
+        }
+    }
 }

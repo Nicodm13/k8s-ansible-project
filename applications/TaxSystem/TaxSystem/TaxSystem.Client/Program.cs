@@ -1,4 +1,5 @@
 using TaxSystem.Client.Services;
+using TaxSystem.Shared.Messaging;
 
 namespace TaxSystem.Client;
 
@@ -9,7 +10,7 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
-
+        builder.Services.AddTaxSystemRabbitMq(builder.Configuration);
         builder.Services.AddScoped<CompanyService>();
         builder.Services.AddScoped<TaxInfoService>();
         builder.Services.AddScoped<CitizenService>();

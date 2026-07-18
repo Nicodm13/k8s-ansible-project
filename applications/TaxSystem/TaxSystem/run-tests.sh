@@ -166,6 +166,14 @@ echo "✓ All images built (parallel)."
 echo ""
 echo "[5/7] Deploying K8s manifests..."
 
+# Apply namespace and storage first, then wait for the namespace to exist
+kubectl apply -f "$SCRIPT_DIR/k8s/storage.yaml"
+if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY (storage/namespace) FAILED"; exit 1; fi
+
+echo "  Waiting for namespace tax-system..."
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/tax-system --timeout=30s
+
+# Now apply the remaining manifests
 kubectl apply -f "$SCRIPT_DIR/k8s/"
 if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY FAILED"; exit 1; fi
 echo "✓ Manifests applied."
@@ -176,14 +184,14 @@ echo ""
 echo "[6/7] Waiting for pods to be ready..."
 
 echo "  Waiting for RabbitMQ..."
-if ! kubectl wait --for=condition=ready pod -l app=rabbitmq --timeout=120s; then
+if ! kubectl wait --for=condition=ready pod -l app=rabbitmq -n tax-system --timeout=120s; then
   echo "✗ RabbitMQ did not become ready"
-  kubectl get pods
+  kubectl get pods -n tax-system
   exit 1
 fi
 
 echo "  Waiting for Client..."
-kubectl wait --for=condition=ready pod -l app=client --timeout=120s || \
+kubectl wait --for=condition=ready pod -l app=client -n tax-system --timeout=120s || \
   echo "  ⚠ Client pod not ready (services may not be implemented yet)"
 
 echo "✓ Pods ready."
@@ -194,12 +202,12 @@ echo ""
 echo "[7/7] Running E2E tests..."
 
 # Get Client URL via Minikube
-CLIENT_BASE_URL=$(minikube service client --url)
+CLIENT_BASE_URL=$(minikube service client -n tax-system --url)
 export CLIENT_BASE_URL
 echo "  CLIENT_BASE_URL = $CLIENT_BASE_URL"
 
 # Port-forward RabbitMQ in background
-kubectl port-forward service/rabbitmq 35672:5672 &
+kubectl port-forward service/rabbitmq 35672:5672 -n tax-system &
 PF_PID=$!
 sleep 2
 
@@ -221,8 +229,8 @@ dotnet test "$SCRIPT_DIR/TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj" \
 if [ $? -ne 0 ]; then
   echo ""
   echo "✗ E2E TESTS FAILED"
-  kubectl get pods
-  kubectl logs -l app=client --tail=30 2>/dev/null || true
+  kubectl get pods -n tax-system
+  kubectl logs -l app=client -n tax-system --tail=30 2>/dev/null || true
   exit 1
 fi
 
