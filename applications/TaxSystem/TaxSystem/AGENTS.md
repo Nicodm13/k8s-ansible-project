@@ -3,35 +3,44 @@
 ## Architecture Overview
 
 **TaxSystem** is an event-driven microservices architecture student project for tax processing:
-- **Client** (ASP.NET Core): API gateway and entry point; routes requests to services
-- **Microservices**: AuditService, CitizenService, CompanyService, InfoCollectorService, StatementGeneratorService
-- **TaxSystem.Shared**: Central models (Citizen, Company, Audit, Statement, Deductible) and messaging abstractions
-- **Communication**: RabbitMQ for async inter-service events; Services publish Event objects with topic + arguments
+- **Client** (ASP.NET Core): API gateway and entry point; publishes commands or routes requests into the service flow
+- **Microservices**: CitizenService, CompanyService, BankService, StatementGeneratorService
+- **TaxSystem.Shared**: Central models, typed MassTransit contracts, RabbitMQ configuration, and filesystem persistence helper
+- **Communication**: MassTransit over RabbitMQ using typed command/event records from `TaxSystem.Shared/Messaging/Contracts`
+- **Persistence**: Temporary JSON filesystem persistence through `TaxSystem.Shared.Persistance.FileSystemRepository`
 
 ## Critical Data Flows
 
 1. **Report Salary** (ReportSalary.feature):
    - Client receives salary report (company CVR, employee CPR, amount)
-   - Triggers event-driven chain: CompanyService → InfoCollectorService → StatementGeneratorService
-   - AuditService listens and logs all operations
+   - Publishes or routes a typed salary-reporting command/event
+   - CompanyService and StatementGeneratorService participate in the statement generation flow
 
 2. **Request Statement** (RequestStatement.feature):
    - Client requests tax statement for citizen
    - Services aggregate data, generate final statement
 
-**Key**: All inter-service communication uses `Event` class (topic + arguments array). Services subscribe via `IMessageQueue.AddHandler(topic, handler)`.
+**Key**: Inter-service communication uses typed MassTransit records. Do not reintroduce the old `Event` class, topic/argument arrays, or `IMessageQueue` abstraction.
 
 ## Messaging Pattern - Know This
 
-The event system uses three `IMessageQueue` implementations:
-- **MessageQueueSync** (in-memory, TaxSystem.Tests): Synchronous pub/sub for fast unit tests
-- **MessageQueueAsync** (in-memory async): For async/await patterns
-- **RabbitMqQueue** (production): Real RabbitMQ broker; configured via environment variables (RABBITMQ_HOST, RABBITMQ_PORT, RABBITMQ_USERNAME, RABBITMQ_PASSWORD)
+Messaging is based on MassTransit:
+- Contracts live in `TaxSystem.Shared/Messaging/Contracts/` as public sealed records.
+- Services call `builder.Services.AddTaxSystemRabbitMq(builder.Configuration)` in `Program.cs`.
+- Consumer classes implementing `IConsumer<TContract>` are auto-registered from the entry assembly by the shared MassTransit registration.
+- Tests can use MassTransit in-memory transport for service-level message tests.
+- Production and E2E messaging uses RabbitMQ.
 
-**Event structure**:
+RabbitMQ configuration:
+- Non-secret config is read from `appsettings.json` under `RabbitMq` (`Host`, `Port`, `VirtualHost`).
+- Credentials must come from environment variables: `RABBITMQ_USERNAME` and `RABBITMQ_PASSWORD`.
+- Do not hardcode RabbitMQ credentials in code or appsettings.
+
+Example contract:
 ```csharp
-new Event("topic.name", arg1, arg2, arg3)  // Arguments serialized to JSON by default
-event.GetArgument<ModelType>(index)          // Deserialize specific argument
+namespace TaxSystem.Shared.Messaging.Contracts;
+
+public sealed record CitizenRegistered(string Cpr, string Name);
 ```
 
 ## Testing Strategy
@@ -41,12 +50,13 @@ event.GetArgument<ModelType>(index)          // Deserialize specific argument
 - `SharedStepDefinitions.cs`: Common "Given" steps (company setup, employee setup)
 - Feature-specific step files: ReportSalaryStepDefinitions.cs, RequestStatementStepDefinitions.cs
 - Test state shared via `ScenarioContext` across step classes
-- Uses `MessageQueueSync` (no Docker/network needed)
+- Uses MassTransit in-memory transport for message tests where needed
+- Repository persistence tests use temporary filesystem folders and `FileSystemRepository`
 - Run: `dotnet test TaxSystem.Tests/TaxSystem.Tests.csproj`
 
 **TaxSystem.Tests.E2E** (full stack, requires Minikube):
 - HTTP requests to Client API gateway
-- Real RabbitMQ broker
+- Real RabbitMQ broker through MassTransit
 - Requires environment variables: CLIENT_BASE_URL, RABBITMQ_HOST/PORT/USERNAME/PASSWORD
 - Run: `dotnet test TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj`
 
@@ -56,23 +66,29 @@ event.GetArgument<ModelType>(index)          // Deserialize specific argument
 - Base image: `mcr.microsoft.com/dotnet/runtime:10.0` (services) or `aspnet:10.0` (Client)
 - Manifests in `k8s/` use `imagePullPolicy: Never` (images built locally in Minikube)
 - Services discovered via Kubernetes DNS: `{service-name}` (e.g., `citizen-service:5000`)
-- Configuration via environment variables, not config files
+- RabbitMQ runs as service `rabbitmq`; in cluster deployments the host is usually `rabbitmq.taxsystem.svc.cluster.local`
+- Persistent service data is mounted at `/var/lib/taxsystem` with `TAXSYSTEM_DATA_PATH=/var/lib/taxsystem`
 
 ## Service Structure Conventions
 
 All service projects follow this layout:
 ```
 TaxSystem.{ServiceName}/
-├── Program.cs              # Minimal DI setup (mostly empty stubs currently)
+├── Program.cs              # Host setup, MassTransit, repository DI
 ├── Repositories/           # Data persistence layer
-│   ├── Read{Entity}Repository.cs
-│   └── Write{Entity}Repository.cs
+│   ├── IRead{Entity}Repository.cs
+│   ├── IWrite{Entity}Repository.cs
+│   └── {Entity}Repository.cs
 ├── Services/               # Business logic
 │   └── {Service}.cs
 └── Dockerfile              # Multi-stage build
 ```
 
-Repository pattern: Write operations return domain objects; Read operations query state. This abstraction allows swapping RabbitMQ handlers with HTTP clients or database backends.
+Repository pattern:
+- Each service has separate read/write interfaces.
+- One concrete repository can implement both interfaces.
+- Repositories currently wrap `FileSystemRepository` and store JSON under service-specific subdirectories such as `citizens`, `companies`, `bank-transfers`, and `statements`.
+- This is temporary persistence and should be replaceable later by DI with PostgreSQL/CloudNativePG-backed implementations.
 
 ## Build & Deployment Commands
 
@@ -99,7 +115,7 @@ kubectl apply -f k8s/
 
 - **.NET 10.0** (latest LTS)
 - **Reqnroll 3.3.4**: BDD test framework (Gherkin)
-- **RabbitMQ.Client 6.8.1**: For RabbitMQ integration
+- **MassTransit.RabbitMQ**: RabbitMQ integration through MassTransit
 - **NUnit 4.5.1**: Test runner
 - **ASP.NET Core 10.0**: Client gateway
 
@@ -107,18 +123,22 @@ kubectl apply -f k8s/
 
 | Purpose | File |
 |---------|------|
-| Event abstraction | `TaxSystem.Shared/Messaging/Event.cs`, `IMessageQueue.cs` |
-| Domain models | `TaxSystem.Shared/Models/` (Citizen, Company, Audit, Statement, Deductible) |
+| Messaging setup | `TaxSystem.Shared/Messaging/MassTransitRabbitMqRegistration.cs` |
+| Message contracts | `TaxSystem.Shared/Messaging/Contracts/` |
+| RabbitMQ options | `TaxSystem.Shared/Messaging/RabbitMqOptions.cs` |
+| Filesystem persistence | `TaxSystem.Shared/Persistance/FileSystemRepository.cs` |
+| Domain models | `TaxSystem.Shared/Models/` |
 | Test workflows | `TaxSystem.Tests/Features/` (ReportSalary.feature, RequestStatement.feature) |
 | K8s deployments | `k8s/` (all YAML manifests) |
-| CI pipeline | `.github/workflows/tests.yml` (must be at repo root) |
+| CI pipeline | repo-root `.github/workflows/` |
 | Test config | `TESTING.md` (comprehensive test documentation) |
 
 ## Common Pitfalls
 
-1. **IMessageQueue interface switching**: Tests use MessageQueueSync; production uses RabbitMqQueue. Register the correct implementation in DI.
-2. **ScenarioContext usage**: In Reqnroll step classes, always store/retrieve test state via ScenarioContext, not static fields.
-3. **K8s service discovery**: Use `hostname:port` (e.g., `rabbitmq:5672`), NOT localhost, in containerized services.
-4. **Feature file regex**: Reqnroll step binding uses regex (e.g., `@"a company with CVR ""(.*)"""`). Regex must match the .feature file step text exactly.
-5. **Dockerfile context**: Docker builds expect the source root at `/src`, with individual project paths relative to that.
+1. **Old messaging abstractions**: Do not use or recreate `Event`, `IMessageQueue`, `MessageQueueSync`, `MessageQueueAsync`, or `RabbitMqQueue`. Use MassTransit typed contracts.
+2. **RabbitMQ secrets**: Keep username/password in `RABBITMQ_USERNAME` and `RABBITMQ_PASSWORD`, never in appsettings.
+3. **ScenarioContext usage**: In Reqnroll step classes, always store/retrieve test state via ScenarioContext, not static fields.
+4. **K8s service discovery**: Use Kubernetes service names from inside containers, not localhost.
+5. **Feature file regex**: Reqnroll step binding uses regex (e.g., `@"a company with CVR ""(.*)"""`). Regex must match the .feature file step text exactly.
+6. **Dockerfile context**: Docker builds expect the source root at `/src`, with individual project paths relative to that.
 

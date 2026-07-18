@@ -68,7 +68,7 @@ jobs:
         run: |
           dotnet build TaxSystem.sln --configuration Release
           for proj in TaxSystem.Client TaxSystem.CitizenService TaxSystem.CompanyService \
-                      TaxSystem.AuditService TaxSystem.InfoCollectorService TaxSystem.StatementGeneratorService; do
+                      TaxSystem.AuditService TaxSystem.StatementGeneratorService; do
             dotnet publish "$proj/$proj.csproj" --configuration Release --no-build \
               -o "publish/$proj" /p:UseAppHost=false
           done
@@ -81,7 +81,6 @@ jobs:
           docker build -q -f TaxSystem.CitizenService/Dockerfile -t taxsystem-citizen-service:latest . &
           docker build -q -f TaxSystem.CompanyService/Dockerfile -t taxsystem-company-service:latest . &
           docker build -q -f TaxSystem.AuditService/Dockerfile -t taxsystem-audit-service:latest . &
-          docker build -q -f TaxSystem.InfoCollectorService/Dockerfile -t taxsystem-infocollector-service:latest . &
           docker build -q -f TaxSystem.StatementGeneratorService/Dockerfile -t taxsystem-statementgenerator-service:latest . &
           wait
 
@@ -92,7 +91,6 @@ jobs:
           kubectl apply -f k8s/citizen-service.yaml
           kubectl apply -f k8s/company-service.yaml
           kubectl apply -f k8s/audit-service.yaml
-          kubectl apply -f k8s/infocollector-service.yaml
           kubectl apply -f k8s/statementgenerator-service.yaml
           kubectl apply -f k8s/client.yaml
 

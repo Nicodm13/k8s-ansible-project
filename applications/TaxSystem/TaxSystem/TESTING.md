@@ -88,7 +88,6 @@ Located in `k8s/`:
 - `citizen-service.yaml`
 - `company-service.yaml`
 - `audit-service.yaml`
-- `infocollector-service.yaml`
 - `statementgenerator-service.yaml`
 
 ## Container Image Size

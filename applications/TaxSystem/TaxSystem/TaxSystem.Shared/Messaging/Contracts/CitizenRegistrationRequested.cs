@@ -6,5 +6,5 @@ public sealed record CitizenRegistrationRequested(
     string LastName,
     string StreetAddress,
     string City,
-    string ZipCode
+    string ZipCode,
     string BankAccountNumber);

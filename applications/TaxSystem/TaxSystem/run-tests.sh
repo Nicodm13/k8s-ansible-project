@@ -61,7 +61,6 @@ PUBLISH_PROJECTS=(
   TaxSystem.CitizenService
   TaxSystem.CompanyService
   TaxSystem.BankService
-  TaxSystem.InfoCollectorService
   TaxSystem.StatementGeneratorService
 )
 
@@ -134,7 +133,6 @@ declare -A SERVICES=(
   ["taxsystem-citizen-service"]="TaxSystem.CitizenService/Dockerfile"
   ["taxsystem-company-service"]="TaxSystem.CompanyService/Dockerfile"
   ["taxsystem-bank-service"]="TaxSystem.BankService/Dockerfile"
-  ["taxsystem-infocollector-service"]="TaxSystem.InfoCollectorService/Dockerfile"
   ["taxsystem-statementgenerator-service"]="TaxSystem.StatementGeneratorService/Dockerfile"
 )
 
