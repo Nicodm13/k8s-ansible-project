@@ -2,13 +2,13 @@ name: Build Application Images
 
 on:
   workflow_dispatch:
-  push:
+  workflow_run:
+    workflows:
+      - Run Tests
     branches:
       - main
-    paths:
-      - "applications/main/app/**"
-      - "applications/TaxSystem/TaxSystem/**"
-      - ".github/workflows/main-application-image.yml"
+    types:
+      - completed
 
 permissions:
   contents: write
@@ -21,17 +21,19 @@ concurrency:
 jobs:
   build:
     name: Build and publish images
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
 
     env:
       REGISTRY_PREFIX: ghcr.io/nicodm13/k8s-ansible-project
-      MAIN_IMAGE_NAME: ghcr.io/nicodm13/k8s-ansible-project/main
-      MAIN_DEPLOYMENT_FILE: applications/main/deployment.yaml
-      TAXSYSTEM_SOLUTION_DIR: applications/TaxSystem/TaxSystem
+      TAXSYSTEM_SOLUTION_DIR: applications/TaxSystem/src
+      SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
 
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
 
       - name: Setup .NET
         uses: actions/setup-dotnet@v4
@@ -44,15 +46,6 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Build and push main image
-        uses: docker/build-push-action@v6
-        with:
-          context: applications/main/app
-          push: true
-          tags: |
-            ${{ env.MAIN_IMAGE_NAME }}:${{ github.sha }}
-            ${{ env.MAIN_IMAGE_NAME }}:latest
 
       - name: Build and publish TaxSystem projects
         shell: bash
@@ -89,11 +82,11 @@ jobs:
           for image in "${!images[@]}"; do
             docker build \
               -f "$TAXSYSTEM_SOLUTION_DIR/${images[$image]}" \
-              -t "$REGISTRY_PREFIX/$image:$GITHUB_SHA" \
+              -t "$REGISTRY_PREFIX/$image:$SOURCE_SHA" \
               -t "$REGISTRY_PREFIX/$image:latest" \
               "$TAXSYSTEM_SOLUTION_DIR"
 
-            docker push "$REGISTRY_PREFIX/$image:$GITHUB_SHA"
+            docker push "$REGISTRY_PREFIX/$image:$SOURCE_SHA"
             docker push "$REGISTRY_PREFIX/$image:latest"
           done
 
@@ -102,21 +95,18 @@ jobs:
         run: |
           set -euo pipefail
 
-          MAIN_IMAGE="${MAIN_IMAGE_NAME}:${GITHUB_SHA}"
-          sed -i -E "s#image: ${MAIN_IMAGE_NAME}:[^[:space:]]+#image: ${MAIN_IMAGE}#" "$MAIN_DEPLOYMENT_FILE"
-
           for file in applications/TaxSystem/*.yaml; do
-            sed -i -E "s#image: ${REGISTRY_PREFIX}/([^:]+):[^[:space:]]+#image: ${REGISTRY_PREFIX}/\1:${GITHUB_SHA}#" "$file"
+            sed -i -E "s#image: ${REGISTRY_PREFIX}/([^:]+):[^[:space:]]+#image: ${REGISTRY_PREFIX}/\1:${SOURCE_SHA}#" "$file"
           done
 
-          git diff -- "$MAIN_DEPLOYMENT_FILE" applications/TaxSystem/*.yaml
+          git diff -- applications/TaxSystem/*.yaml
 
       - name: Commit deployment manifest updates
         shell: bash
         run: |
           set -euo pipefail
 
-          if git diff --quiet -- "$MAIN_DEPLOYMENT_FILE" applications/TaxSystem/*.yaml; then
+          if git diff --quiet -- applications/TaxSystem/*.yaml; then
             echo "Deployment manifests already point at this image."
             exit 0
           fi
@@ -124,6 +114,6 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
 
-          git add "$MAIN_DEPLOYMENT_FILE" applications/TaxSystem/*.yaml
-          git commit -m "Deploy application images ${GITHUB_SHA}"
-          git push
+          git add applications/TaxSystem/*.yaml
+          git commit -m "Deploy application images ${SOURCE_SHA}"
+          git push origin HEAD:main

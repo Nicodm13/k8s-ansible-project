@@ -2,13 +2,19 @@ name: Deploy Kubernetes
 
 on:
   workflow_dispatch:
+  workflow_run:
+    workflows:
+      - Build Application Images
+    branches:
+      - main
+    types:
+      - completed
   push:
     branches:
       - main
     paths:
       - "applications/*.yaml"
       - "applications/grafana/*.yaml"
-      - "applications/main/*.yaml"
       - "applications/TaxSystem/*.yaml"
       - "infrastructure/**"
       - "clusters/azure/flux/**"
@@ -24,6 +30,7 @@ concurrency:
 jobs:
   deploy:
     name: Deploy to cluster
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on:
       - self-hosted
       - Linux
