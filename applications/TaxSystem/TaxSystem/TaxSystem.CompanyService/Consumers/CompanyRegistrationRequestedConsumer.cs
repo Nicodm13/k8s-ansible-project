@@ -16,6 +16,13 @@ public class CompanyRegistrationRequestedConsumer : IConsumer<CompanyRegistratio
     public async Task Consume(ConsumeContext<CompanyRegistrationRequested> context)
     {
         var company = await _companyService.RegisterCompanyAsync(context.Message.Cvr, context.Message.Name);
-        await context.Publish(new CompanyRegistered(company.CVR, company.Name));
+        var companyRegistered = new CompanyRegistered(company.CVR, company.Name);
+
+        if (context.ResponseAddress is not null)
+        {
+            await context.RespondAsync(companyRegistered);
+        }
+
+        await context.Publish(companyRegistered);
     }
 }

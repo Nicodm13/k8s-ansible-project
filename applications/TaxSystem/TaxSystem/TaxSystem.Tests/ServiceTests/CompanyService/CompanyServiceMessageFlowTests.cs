@@ -65,6 +65,31 @@ public class CompanyServiceMessageFlowTests
     }
 
     [Test]
+    public async Task CompanyRegistrationRequestRespondsAfterCompanyIsPersisted()
+    {
+        await using var provider = BuildProvider(_ => { });
+        var bus = provider.GetRequiredService<IBusControl>();
+
+        await bus.StartAsync();
+        try
+        {
+            using var scope = provider.CreateScope();
+            var client = scope.ServiceProvider.GetRequiredService<IRequestClient<CompanyRegistrationRequested>>();
+            var response = await client.GetResponse<CompanyRegistered>(new CompanyRegistrationRequested("12345678", "Acme Corp"));
+            var company = await provider.GetRequiredService<IReadCompanyRepository>().GetByCvrAsync("12345678");
+
+            Assert.That(response.Message, Is.EqualTo(new CompanyRegistered("12345678", "Acme Corp")));
+            Assert.That(company, Is.Not.Null);
+            Assert.That(company!.CVR, Is.EqualTo("12345678"));
+            Assert.That(company.Name, Is.EqualTo("Acme Corp"));
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
+    }
+
+    [Test]
     public async Task ReportSalaryPublishesCompanyAndTaxInfoWhenCompanyExists()
     {
         var companyInfoReceived = new TaskCompletionSource<CompanyInfoReceived>();
@@ -178,6 +203,7 @@ public class CompanyServiceMessageFlowTests
             busRegistrationConfigurator.AddConsumer<CompanyDeregistrationRequestedConsumer>();
             busRegistrationConfigurator.AddConsumer<CompanyInfoRequestedConsumer>();
             busRegistrationConfigurator.AddConsumer<ReportSalaryConsumer>();
+            busRegistrationConfigurator.AddRequestClient<CompanyRegistrationRequested>();
             busRegistrationConfigurator.AddRequestClient<CompanyInfoRequested>();
             busRegistrationConfigurator.UsingInMemory((context, configurator) =>
             {

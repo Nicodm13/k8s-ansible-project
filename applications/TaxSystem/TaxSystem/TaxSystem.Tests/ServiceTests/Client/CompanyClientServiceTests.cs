@@ -47,6 +47,7 @@ public class CompanyClientServiceTests
         services.AddScoped<CompanyClientService>();
         services.AddMassTransit(busRegistrationConfigurator =>
         {
+            busRegistrationConfigurator.AddRequestClient<CompanyRegistrationRequested>();
             busRegistrationConfigurator.AddRequestClient<CompanyInfoRequested>();
             busRegistrationConfigurator.UsingInMemory((_, configurator) => configure(configurator));
         });

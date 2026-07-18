@@ -8,13 +8,16 @@ public class CompanyClientService
 {
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly IRequestClient<CompanyInfoRequested> _companyInfoClient;
+    private readonly IRequestClient<CompanyRegistrationRequested> _companyRegistrationClient;
 
     public CompanyClientService(
         IPublishEndpoint publishEndpoint,
-        IRequestClient<CompanyInfoRequested> companyInfoClient)
+        IRequestClient<CompanyInfoRequested> companyInfoClient,
+        IRequestClient<CompanyRegistrationRequested> companyRegistrationClient)
     {
         _publishEndpoint = publishEndpoint;
         _companyInfoClient = companyInfoClient;
+        _companyRegistrationClient = companyRegistrationClient;
     }
 
     public async Task<Company?> getCompanyFromCvr(string cvr)
@@ -41,7 +44,7 @@ public class CompanyClientService
 
     public async Task RegisterCompany(Company company)
     {
-        await _publishEndpoint.Publish(new CompanyRegistrationRequested(company.CVR, company.Name));
+        await _companyRegistrationClient.GetResponse<CompanyRegistered>(new CompanyRegistrationRequested(company.CVR, company.Name));
     }
 
     public async Task UpdateCompany(Company? company)

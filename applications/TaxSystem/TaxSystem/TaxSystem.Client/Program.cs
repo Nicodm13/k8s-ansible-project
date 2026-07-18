@@ -17,6 +17,7 @@ public class Program
         builder.Services.AddTaxSystemRabbitMq(builder.Configuration, registrationConfigurator =>
         {
             registrationConfigurator.AddRequestClient<CompanyInfoRequested>();
+            registrationConfigurator.AddRequestClient<CompanyRegistrationRequested>();
         });
         builder.Services.AddControllers();
         builder.Services.AddHealthChecks();
