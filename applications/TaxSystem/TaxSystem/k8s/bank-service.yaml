@@ -1,22 +1,22 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: infocollector-service
+  name: bank-service
   labels:
-    app: infocollector-service
+    app: bank-service
 spec:
   replicas: 1
   selector:
     matchLabels:
-      app: infocollector-service
+      app: bank-service
   template:
     metadata:
       labels:
-        app: infocollector-service
+        app: bank-service
     spec:
       containers:
-        - name: infocollector-service
-          image: taxsystem-infocollector-service:latest
+        - name: bank-service
+          image: taxsystem-bank-service:latest
           imagePullPolicy: Never
           env:
             - name: RABBITMQ_HOST
@@ -31,11 +31,10 @@ spec:
 apiVersion: v1
 kind: Service
 metadata:
-  name: infocollector-service
+  name: bank-service
 spec:
   selector:
-    app: infocollector-service
+    app: bank-service
   ports:
     - port: 80
       targetPort: 8080
-

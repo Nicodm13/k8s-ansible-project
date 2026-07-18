@@ -60,7 +60,7 @@ PUBLISH_PROJECTS=(
   TaxSystem.Client
   TaxSystem.CitizenService
   TaxSystem.CompanyService
-  TaxSystem.AuditService
+  TaxSystem.BankService
   TaxSystem.InfoCollectorService
   TaxSystem.StatementGeneratorService
 )
@@ -133,7 +133,7 @@ declare -A SERVICES=(
   ["taxsystem-client"]="TaxSystem.Client/Dockerfile"
   ["taxsystem-citizen-service"]="TaxSystem.CitizenService/Dockerfile"
   ["taxsystem-company-service"]="TaxSystem.CompanyService/Dockerfile"
-  ["taxsystem-audit-service"]="TaxSystem.AuditService/Dockerfile"
+  ["taxsystem-bank-service"]="TaxSystem.BankService/Dockerfile"
   ["taxsystem-infocollector-service"]="TaxSystem.InfoCollectorService/Dockerfile"
   ["taxsystem-statementgenerator-service"]="TaxSystem.StatementGeneratorService/Dockerfile"
 )
