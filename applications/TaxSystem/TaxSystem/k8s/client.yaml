@@ -26,11 +26,21 @@ spec:
               value: "rabbitmq"
             - name: RABBITMQ_PORT
               value: "5672"
+            - name: RABBITMQ_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: RABBITMQ_USERNAME
+            - name: RABBITMQ_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: RABBITMQ_PASSWORD
             - name: ASPNETCORE_URLS
               value: "http://+:8080"
           readinessProbe:
             httpGet:
-              path: /openapi/v1.json
+              path: /healthz
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 5

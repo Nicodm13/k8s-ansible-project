@@ -15,6 +15,7 @@ public class Program
         builder.Services.AddScoped<TaxInfoService>();
         builder.Services.AddScoped<CitizenService>();
         builder.Services.AddControllers();
+        builder.Services.AddHealthChecks();
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
 
@@ -28,7 +29,7 @@ public class Program
 
         app.UseAuthorization();
 
-
+        app.MapHealthChecks("/healthz");
         app.MapControllers();
 
         app.Run();

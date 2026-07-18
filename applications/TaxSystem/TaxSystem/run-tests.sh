@@ -167,13 +167,18 @@ echo ""
 echo "[5/7] Deploying K8s manifests..."
 
 # Apply namespace and storage first, then wait for the namespace to exist
+# PVC spec is immutable; delete it first so a clean one can be created
+kubectl delete pvc taxsystem-data -n tax-system --ignore-not-found
+kubectl delete pv taxsystem-data --ignore-not-found
 kubectl apply -f "$SCRIPT_DIR/k8s/storage.yaml"
 if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY (storage/namespace) FAILED"; exit 1; fi
 
 echo "  Waiting for namespace tax-system..."
-kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/tax-system --timeout=30s
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/tax-system --timeout=15s
 
 # Now apply the remaining manifests
+# Delete existing deployments first so old ReplicaSets/pods don't linger
+kubectl delete deployments --all -n tax-system --ignore-not-found
 kubectl apply -f "$SCRIPT_DIR/k8s/"
 if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY FAILED"; exit 1; fi
 echo "✓ Manifests applied."
@@ -181,20 +186,40 @@ echo "✓ Manifests applied."
 # ─── Step 6: Wait for pods ───────────────────────────────────────────────────
 
 echo ""
-echo "[6/7] Waiting for pods to be ready..."
+echo "[6/7] Waiting for all pods to be ready..."
 
-echo "  Waiting for RabbitMQ..."
-if ! kubectl wait --for=condition=ready pod -l app=rabbitmq -n tax-system --timeout=120s; then
-  echo "✗ RabbitMQ did not become ready"
-  kubectl get pods -n tax-system
+WAIT_TIMEOUT=45s
+ALL_READY=true
+
+# Wait for every pod in the namespace to become ready
+if ! kubectl wait --for=condition=ready pod --all -n tax-system --timeout="$WAIT_TIMEOUT"; then
+  ALL_READY=false
+  echo ""
+  echo "✗ Some pods did not become ready within $WAIT_TIMEOUT"
+  echo ""
+
+  # Show pod overview
+  echo "── Pod status ──────────────────────────────────────────"
+  kubectl get pods -n tax-system -o wide
+  echo ""
+
+  # Print logs and events for each non-ready pod
+  NOT_READY_PODS=$(kubectl get pods -n tax-system --no-headers \
+    | awk '$3 != "Running" || $2 !~ /^([0-9]+)\/\1$/ { print $1 }')
+
+  for pod in $NOT_READY_PODS; do
+    echo "── Describe pod/$pod ─────────────────────────────────"
+    kubectl describe pod "$pod" -n tax-system | tail -30
+    echo ""
+    echo "── Logs pod/$pod ─────────────────────────────────────"
+    kubectl logs "$pod" -n tax-system --tail=40 2>&1 || true
+    echo ""
+  done
+
   exit 1
 fi
 
-echo "  Waiting for Client..."
-kubectl wait --for=condition=ready pod -l app=client -n tax-system --timeout=120s || \
-  echo "  ⚠ Client pod not ready (services may not be implemented yet)"
-
-echo "✓ Pods ready."
+echo "✓ All pods ready."
 
 # ─── Step 7: Run E2E tests ───────────────────────────────────────────────────
 

@@ -8,6 +8,7 @@ kind: PersistentVolume
 metadata:
   name: taxsystem-data
 spec:
+  storageClassName: ""
   capacity:
     storage: 1Gi
   accessModes:
@@ -23,6 +24,7 @@ metadata:
   name: taxsystem-data
   namespace: tax-system
 spec:
+  storageClassName: ""
   accessModes:
     - ReadWriteMany
   resources:
