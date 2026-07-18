@@ -1,0 +1,75 @@
+name: Deploy Kubernetes
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - "applications/**"
+      - "infrastructure/**"
+      - "clusters/azure/flux/**"
+      - ".github/workflows/deploy-kubernetes.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: deploy-kubernetes
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    name: Deploy to cluster
+    runs-on:
+      - self-hosted
+      - Linux
+      - X64
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - name: Verify cluster access
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          kubectl version --client
+          kubectl get namespace flux-system
+          flux --version
+
+      - name: Reconcile Flux
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          flux reconcile source git flux-system \
+            --namespace flux-system
+
+          flux reconcile kustomization infrastructure \
+            --namespace flux-system \
+            --with-source
+
+          kubectl wait helmrelease/rabbitmq \
+            --namespace taxsystem \
+            --for=condition=Ready \
+            --timeout=5m
+
+          kubectl get secret rabbitmq \
+            --namespace taxsystem \
+            --output name
+
+          flux reconcile kustomization applications \
+            --namespace flux-system \
+            --with-source
+
+      - name: Show Flux status
+        if: always()
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          flux get kustomizations --namespace flux-system

@@ -2,7 +2,7 @@ apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
   name: rabbitmq
-  namespace: rabbitmq
+  namespace: taxsystem
 
 spec:
   interval: 30m
