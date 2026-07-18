@@ -20,6 +20,7 @@ internal class Program
             serviceProvider.GetRequiredService<CitizenRepository>());
         builder.Services.AddSingleton<IWriteCitizenRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<CitizenRepository>());
+        builder.Services.AddSingleton<Services.CitizenService>();
 
         var host = builder.Build();
 

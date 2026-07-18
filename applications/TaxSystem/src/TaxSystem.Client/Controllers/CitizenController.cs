@@ -8,11 +8,11 @@ using Microsoft.AspNetCore.Mvc;
 [Route("Citizen")]
 public class CitizenController : ControllerBase
 {
-    private readonly CitizenService _citizenService;
+    private readonly CitizenClientService _citizenClientService;
 
-    public CitizenController(CitizenService citizenService)
+    public CitizenController(CitizenClientService citizenClientService)
     {
-        _citizenService = citizenService;
+        _citizenClientService = citizenClientService;
     }
 
     [HttpGet("{citizenId}/Statements/{statementId}")]
@@ -25,7 +25,7 @@ public class CitizenController : ControllerBase
 
         try
         {
-            var statement = _citizenService.GetStatementByCitizenIdAndYear(citizenId, statementId);
+            var statement = _citizenClientService.GetStatementByCitizenIdAndYear(citizenId, statementId);
             return Ok(statement);
         }
         catch (NotImplementedException)
@@ -48,7 +48,7 @@ public class CitizenController : ControllerBase
 
         try
         {
-            var statement = _citizenService.GetStatementByCitizenIdAndYear(citizenId, DateTime.Now.Year);
+            var statement = _citizenClientService.GetStatementByCitizenIdAndYear(citizenId, DateTime.Now.Year);
             return Ok(statement);
         }
         catch (NotImplementedException)
@@ -71,7 +71,7 @@ public class CitizenController : ControllerBase
 
         try
         {
-            _citizenService.ReportIncome(citizenId, year, income);
+            _citizenClientService.ReportIncome(citizenId, year, income);
             return Ok("Income reported successfully.");
         }
         catch (NotImplementedException)
@@ -94,7 +94,7 @@ public class CitizenController : ControllerBase
 
         try
         {
-            _citizenService.ReportDeductibles(citizenId, year, deductibles);
+            _citizenClientService.ReportDeductibles(citizenId, year, deductibles);
             return Ok("Deductibles reported successfully.");
         }
         catch (NotImplementedException)
@@ -112,12 +112,16 @@ public class CitizenController : ControllerBase
     {
         try
         {
-            var result = await _citizenService.createCitizen(citizen);
+            var result = await _citizenClientService.createCitizen(citizen);
             return Ok(result);
         }
         catch (InvalidOperationException ex)
         {
             return Conflict(ex.Message);
+        }
+        catch (TimeoutException ex)
+        {
+            return StatusCode(StatusCodes.Status504GatewayTimeout, ex.Message);
         }
         catch (Exception)
         {

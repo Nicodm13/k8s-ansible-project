@@ -8,12 +8,12 @@ using Microsoft.AspNetCore.Mvc;
 [Route("Government")]
 public class GovernmentController : ControllerBase
 {
-    private readonly CitizenService _citizenService;
+    private readonly CitizenClientService _citizenClientService;
     private readonly CompanyClientService _companyService;
 
-    public GovernmentController(CitizenService citizenService, CompanyClientService companyservice)
+    public GovernmentController(CitizenClientService citizenClientService, CompanyClientService companyservice)
     {
-        _citizenService = citizenService;
+        _citizenClientService = citizenClientService;
         _companyService = companyservice;
     }
 
@@ -22,7 +22,7 @@ public class GovernmentController : ControllerBase
     {
         try
         {
-            _citizenService.createCitizen(citizen);
+            _citizenClientService.createCitizen(citizen);
             return Ok("Citizen registered successfully.");
         }
         catch (Exception)

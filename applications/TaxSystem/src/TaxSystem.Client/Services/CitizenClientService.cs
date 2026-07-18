@@ -1,18 +1,26 @@
 using MassTransit;
+using TaxSystem.Shared.Messaging;
 using TaxSystem.Shared.Messaging.Contracts;
 using TaxSystem.Shared.Models;
 
 namespace TaxSystem.Client.Services;
 
-public class CitizenService
+public class CitizenClientService
 {
     private readonly TaxInfoService _taxInfoService;
     private readonly IPublishEndpoint _publishEndpoint;
+    private readonly EventAwaiter<CitizenRegistered> _citizenRegisteredAwaiter;
 
-    public CitizenService(TaxInfoService taxInfoService, IPublishEndpoint publishEndpoint)
+    private static readonly TimeSpan RegistrationTimeout = TimeSpan.FromSeconds(30);
+
+    public CitizenClientService(
+        TaxInfoService taxInfoService,
+        IPublishEndpoint publishEndpoint,
+        EventAwaiter<CitizenRegistered> citizenRegisteredAwaiter)
     {
         _taxInfoService = taxInfoService;
         _publishEndpoint = publishEndpoint;
+        _citizenRegisteredAwaiter = citizenRegisteredAwaiter;
     }
 
     public Statement GetStatementByCitizenIdAndYear(int citizenId, int year)
@@ -36,18 +44,22 @@ public class CitizenService
     /// </summary>
     /// <param name="citizen"></param>
     /// <exception cref="InvalidOperationException">thrown if attempting to create a citizen that already exists</exception>
+    /// <exception cref="TimeoutException">thrown if CitizenService does not confirm registration in time</exception>
     public async Task<Citizen> createCitizen(Citizen citizen)
     {
         _taxInfoService.RegisterCitizen(citizen);
 
-        await _publishEndpoint.Publish(new CitizenRegistrationRequested(
+        await _citizenRegisteredAwaiter.PublishAndWait(
+            () => _publishEndpoint.Publish(new CitizenRegistrationRequested(
+                citizen.cpr,
+                citizen.firstName,
+                citizen.lastName,
+                citizen.streetAddress,
+                citizen.city,
+                citizen.zipCode,
+                citizen.bankAccountNumber)),
             citizen.cpr,
-            citizen.firstName,
-            citizen.lastName,
-            citizen.streetAddress,
-            citizen.city,
-            citizen.zipCode,
-            citizen.bankAccountNumber));
+            RegistrationTimeout);
 
         return citizen;
     }
@@ -62,5 +74,3 @@ public class CitizenService
         throw new NotImplementedException();
     }
 }
-
-
