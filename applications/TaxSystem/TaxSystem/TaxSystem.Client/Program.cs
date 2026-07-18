@@ -1,4 +1,6 @@
 using TaxSystem.Client.Services;
+using TaxSystem.Shared.Messaging;
+using TaxSystem.Shared.Messaging.Contracts;
 
 namespace TaxSystem.Client;
 
