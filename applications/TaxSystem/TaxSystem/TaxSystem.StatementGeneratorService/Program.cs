@@ -1,9 +1,18 @@
-﻿namespace TaxSystem.StatementGenerator;
+﻿using Microsoft.Extensions.Hosting;
+using TaxSystem.Shared.Messaging;
 
-class Program
+namespace TaxSystem.StatementGenerator;
+
+internal class Program
 {
-    static void Main(string[] args)
+    private static async Task Main(string[] args)
     {
-        Console.WriteLine("Hello, World!");
+        var builder = Host.CreateApplicationBuilder(args);
+
+        builder.Services.AddTaxSystemRabbitMq(builder.Configuration);
+
+        var host = builder.Build();
+
+        await host.RunAsync();
     }
 }
