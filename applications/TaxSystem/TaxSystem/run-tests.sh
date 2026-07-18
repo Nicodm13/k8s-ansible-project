@@ -254,8 +254,8 @@ dotnet test "$SCRIPT_DIR/TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj" \
 if [ $? -ne 0 ]; then
   echo ""
   echo "✗ E2E TESTS FAILED"
-  kubectl get pods
-  kubectl logs -l app=client --tail=30 2>/dev/null || true
+  kubectl get pods --namespace tax-system
+  kubectl logs --namespace tax-system -l app=client --tail=30 2>/dev/null || true
   exit 1
 fi
 
