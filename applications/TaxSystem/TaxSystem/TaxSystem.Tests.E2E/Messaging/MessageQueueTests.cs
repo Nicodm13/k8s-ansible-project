@@ -1,3 +1,5 @@
+using MassTransit;
+using TaxSystem.Shared.Messaging.Contracts;
 using TaxSystem.Shared.Messaging;
 
 namespace TaxSystem.Tests.E2E.Messaging;
@@ -6,27 +8,42 @@ namespace TaxSystem.Tests.E2E.Messaging;
 public sealed class MessageQueueTests
 {
     [Test]
-    public void RabbitMqQueuePublishesEventToMatchingHandler()
+    public async Task MassTransitRabbitMqPublishesMessageToMatchingHandler()
     {
-        var topic = $"TaxSystem.Test.{Guid.NewGuid():N}";
-        using var queue = new RabbitMqQueue(RabbitMqOptions.FromEnvironment());
-        using var receivedSignal = new ManualResetEventSlim();
-        Event? received = null;
-
-        queue.AddHandler(topic, @event =>
+        var options = RabbitMqOptions.FromEnvironment();
+        var queueName = $"taxsystem-test-{Guid.NewGuid():N}";
+        var received = new TaskCompletionSource<CitizenRegistered>();
+        var bus = Bus.Factory.CreateUsingRabbitMq(configurator =>
         {
-            received = @event;
-            receivedSignal.Set();
+            configurator.Host(options.HostName, (ushort)options.Port, options.VirtualHost, hostConfigurator =>
+            {
+                hostConfigurator.Username(options.UserName);
+                hostConfigurator.Password(options.Password);
+            });
+
+            configurator.ReceiveEndpoint(queueName, endpoint =>
+            {
+                endpoint.Handler<CitizenRegistered>(context =>
+                {
+                    received.SetResult(context.Message);
+                    return Task.CompletedTask;
+                });
+            });
         });
 
-        queue.Publish(new Event(topic, new Citizen("010101-1234", "John Doe")));
+        await bus.StartAsync();
+        try
+        {
+            await bus.Publish(new CitizenRegistered("010101-1234", "John Doe"));
 
-        Assert.That(receivedSignal.Wait(TimeSpan.FromSeconds(5)), Is.True);
-        Assert.That(received, Is.Not.Null);
-        Assert.That(received!.Topic, Is.EqualTo(topic));
-        Assert.That(received.GetArgument<Citizen>(0), Is.EqualTo(new Citizen("010101-1234", "John Doe")));
+            var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(10));
+
+            Assert.That(message, Is.EqualTo(new CitizenRegistered("010101-1234", "John Doe")));
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
     }
-
-    private sealed record Citizen(string Cpr, string Name);
 }
 

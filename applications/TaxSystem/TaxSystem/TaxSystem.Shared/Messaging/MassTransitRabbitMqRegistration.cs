@@ -1,3 +1,4 @@
+using System.Reflection;
 using MassTransit;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -14,6 +15,12 @@ public static class MassTransitRabbitMqRegistration
 
         services.AddMassTransit(busRegistrationConfigurator =>
         {
+            var entryAssembly = Assembly.GetEntryAssembly();
+            if (entryAssembly is not null)
+            {
+                busRegistrationConfigurator.AddConsumers(entryAssembly);
+            }
+
             busRegistrationConfigurator.UsingRabbitMq((context, rabbitMqConfigurator) =>
             {
                 rabbitMqConfigurator.Host(options.HostName, (ushort)options.Port, options.VirtualHost, hostConfigurator =>

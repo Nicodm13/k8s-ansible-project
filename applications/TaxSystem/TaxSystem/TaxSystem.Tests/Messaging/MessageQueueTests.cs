@@ -1,4 +1,5 @@
-using TaxSystem.Shared.Messaging;
+using MassTransit;
+using TaxSystem.Shared.Messaging.Contracts;
 
 namespace TaxSystem.Tests.Messaging;
 
@@ -6,21 +7,33 @@ namespace TaxSystem.Tests.Messaging;
 public sealed class MessageQueueTests
 {
     [Test]
-    public void SyncQueuePublishesEventToMatchingHandler()
+    public async Task InMemoryBusPublishesMessageToMatchingHandler()
     {
-        var queue = new MessageQueueSync();
-        Event? received = null;
+        var received = new TaskCompletionSource<CitizenRegistered>();
+        var bus = Bus.Factory.CreateUsingInMemory(configurator =>
+        {
+            configurator.ReceiveEndpoint("citizen-registered-test", endpoint =>
+            {
+                endpoint.Handler<CitizenRegistered>(context =>
+                {
+                    received.SetResult(context.Message);
+                    return Task.CompletedTask;
+                });
+            });
+        });
 
-        queue.AddHandler("CitizenRegistered", @event => received = @event);
+        await bus.StartAsync();
+        try
+        {
+            await bus.Publish(new CitizenRegistered("010101-1234", "John Doe"));
 
-        queue.Publish(new Event("CitizenRegistered", new Citizen("010101-1234", "John Doe")));
+            var message = await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
-        Assert.That(received, Is.Not.Null);
-        Assert.That(received!.Topic, Is.EqualTo("CitizenRegistered"));
-
-        var citizen = received.GetArgument<Citizen>(0);
-        Assert.That(citizen, Is.EqualTo(new Citizen("010101-1234", "John Doe")));
+            Assert.That(message, Is.EqualTo(new CitizenRegistered("010101-1234", "John Doe")));
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
     }
-
-    private sealed record Citizen(string Cpr, string Name);
 }

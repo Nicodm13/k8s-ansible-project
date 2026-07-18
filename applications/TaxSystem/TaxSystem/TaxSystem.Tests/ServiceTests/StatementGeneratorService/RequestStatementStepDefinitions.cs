@@ -1,4 +1,5 @@
-using TaxSystem.Shared.Messaging;
+using MassTransit;
+using TaxSystem.Shared.Messaging.Contracts;
 
 namespace TaxSystem.Tests.StepDefinitions;
 
@@ -10,8 +11,7 @@ namespace TaxSystem.Tests.StepDefinitions;
 public sealed class RequestStatementStepDefinitions
 {
     private readonly ScenarioContext _scenarioContext;
-    private readonly MessageQueueSync _messageQueue = new();
-    private Event? _lastPublishedEvent;
+    private SalaryReported? _lastPublishedEvent;
 
     public RequestStatementStepDefinitions(ScenarioContext scenarioContext)
     {
@@ -19,22 +19,44 @@ public sealed class RequestStatementStepDefinitions
     }
 
     [When(@"the salary report is generated")]
-    public void WhenTheSalaryReportIsGenerated()
+    public async Task WhenTheSalaryReportIsGenerated()
     {
-        var cpr = _scenarioContext["EmployeeCpr"] as string;
-        var name = _scenarioContext["EmployeeName"] as string;
+        var cpr = _scenarioContext["EmployeeCpr"] as string
+            ?? throw new InvalidOperationException("Employee CPR is missing from the scenario context.");
+        var name = _scenarioContext["EmployeeName"] as string
+            ?? throw new InvalidOperationException("Employee name is missing from the scenario context.");
         var salary = (int)_scenarioContext["Salary"];
+        var received = new TaskCompletionSource<SalaryReported>();
+        var bus = Bus.Factory.CreateUsingInMemory(configurator =>
+        {
+            configurator.ReceiveEndpoint("salary-reported-request-test", endpoint =>
+            {
+                endpoint.Handler<SalaryReported>(context =>
+                {
+                    received.SetResult(context.Message);
+                    return Task.CompletedTask;
+                });
+            });
+        });
 
-        _messageQueue.AddHandler("SalaryReported", e => _lastPublishedEvent = e);
-        _messageQueue.Publish(new Event("SalaryReported", cpr, name, salary));
+        await bus.StartAsync();
+        try
+        {
+            await bus.Publish(new SalaryReported(cpr, name, salary));
+            _lastPublishedEvent = await received.Task.WaitAsync(TimeSpan.FromSeconds(5));
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
     }
 
     [Then(@"the report should contain ""(.*)"" and a gross income of (\d+)")]
     public void ThenTheReportShouldContainAndAGrossIncomeOf(string name, int grossIncome)
     {
         Assert.That(_lastPublishedEvent, Is.Not.Null, "Expected a SalaryReported event to be published.");
-        Assert.That(_lastPublishedEvent!.GetArgument<string>(1), Is.EqualTo(name));
-        Assert.That(_lastPublishedEvent.GetArgument<int>(2), Is.EqualTo(grossIncome));
+        Assert.That(_lastPublishedEvent!.Name, Is.EqualTo(name));
+        Assert.That(_lastPublishedEvent.Salary, Is.EqualTo(grossIncome));
     }
 }
 
