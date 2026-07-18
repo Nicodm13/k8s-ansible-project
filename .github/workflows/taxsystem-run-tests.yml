@@ -6,13 +6,7 @@ on:
     paths:
       - "applications/TaxSystem/src/**"
       - ".github/workflows/taxsystem-run-tests.yml"
-  push:
-    branches:
-      - main
-    paths:
-      - "applications/TaxSystem/src/**"
-      - ".github/workflows/taxsystem-run-tests.yml"
-
+      
 permissions:
   contents: read
 
