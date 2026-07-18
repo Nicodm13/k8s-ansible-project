@@ -1,4 +1,5 @@
 using TaxSystem.Client.Services;
+using TaxSystem.Shared.Messaging;
 
 namespace TaxSystem.Client;
 
@@ -13,6 +14,7 @@ public class Program
         builder.Services.AddScoped<CompanyService>();
         builder.Services.AddScoped<TaxInfoService>();
         builder.Services.AddScoped<CitizenService>();
+        builder.Services.AddTaxSystemRabbitMq(builder.Configuration);
         builder.Services.AddControllers();
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
