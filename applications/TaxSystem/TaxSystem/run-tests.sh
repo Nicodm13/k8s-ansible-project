@@ -166,8 +166,22 @@ echo "✓ All images built (parallel)."
 echo ""
 echo "[5/7] Deploying K8s manifests..."
 
-kubectl apply -f "$SCRIPT_DIR/k8s/"
-if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY FAILED"; exit 1; fi
+kubectl apply -f "$SCRIPT_DIR/k8s/storage.yaml"
+if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY FAILED: storage"; exit 1; fi
+
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/tax-system --timeout=30s
+if [ $? -ne 0 ]; then echo "✗ NAMESPACE DID NOT BECOME ACTIVE"; exit 1; fi
+
+for manifest in \
+  rabbitmq.yaml \
+  bank-service.yaml \
+  citizen-service.yaml \
+  client.yaml \
+  company-service.yaml \
+  statementgenerator-service.yaml; do
+  kubectl apply -f "$SCRIPT_DIR/k8s/$manifest"
+  if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY FAILED: $manifest"; exit 1; fi
+done
 echo "✓ Manifests applied."
 
 # ─── Step 6: Wait for pods ───────────────────────────────────────────────────
@@ -176,14 +190,14 @@ echo ""
 echo "[6/7] Waiting for pods to be ready..."
 
 echo "  Waiting for RabbitMQ..."
-if ! kubectl wait --for=condition=ready pod -l app=rabbitmq --timeout=120s; then
+if ! kubectl wait --namespace tax-system --for=condition=ready pod -l app=rabbitmq --timeout=120s; then
   echo "✗ RabbitMQ did not become ready"
-  kubectl get pods
+  kubectl get pods --namespace tax-system
   exit 1
 fi
 
 echo "  Waiting for Client..."
-kubectl wait --for=condition=ready pod -l app=client --timeout=120s || \
+kubectl wait --namespace tax-system --for=condition=ready pod -l app=client --timeout=120s || \
   echo "  ⚠ Client pod not ready (services may not be implemented yet)"
 
 echo "✓ Pods ready."
@@ -194,12 +208,12 @@ echo ""
 echo "[7/7] Running E2E tests..."
 
 # Get Client URL via Minikube
-CLIENT_BASE_URL=$(minikube service client --url)
+CLIENT_BASE_URL=$(minikube service --namespace tax-system client --url)
 export CLIENT_BASE_URL
 echo "  CLIENT_BASE_URL = $CLIENT_BASE_URL"
 
 # Port-forward RabbitMQ in background
-kubectl port-forward service/rabbitmq 35672:5672 &
+kubectl port-forward --namespace tax-system service/rabbitmq 35672:5672 &
 PF_PID=$!
 sleep 2
 
