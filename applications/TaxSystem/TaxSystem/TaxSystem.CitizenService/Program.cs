@@ -1,6 +1,9 @@
 ﻿using System.Threading.Tasks;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using TaxSystem.CitizenService.Repositories;
 using TaxSystem.Shared.Messaging;
+using TaxSystem.Shared.Persistance;
 
 namespace TaxSystem.CitizenService;
 
@@ -11,6 +14,12 @@ internal class Program
         var builder = Host.CreateApplicationBuilder(args);
 
         builder.Services.AddTaxSystemRabbitMq(builder.Configuration);
+        builder.Services.AddSingleton(_ => new FileSystemRepository("citizens"));
+        builder.Services.AddSingleton<CitizenRepository>();
+        builder.Services.AddSingleton<IReadCitizenRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<CitizenRepository>());
+        builder.Services.AddSingleton<IWriteCitizenRepository>(serviceProvider =>
+            serviceProvider.GetRequiredService<CitizenRepository>());
 
         var host = builder.Build();
 
