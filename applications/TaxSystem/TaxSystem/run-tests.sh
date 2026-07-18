@@ -166,19 +166,19 @@ echo "✓ All images built (parallel)."
 echo ""
 echo "[5/7] Deploying K8s manifests..."
 
-# Apply namespace and storage first, then wait for the namespace to exist
-# PVC spec is immutable; delete it first so a clean one can be created
-kubectl delete pvc taxsystem-data -n tax-system --ignore-not-found
-kubectl delete pv taxsystem-data --ignore-not-found
+# Clean up in the right order: deployments first (releases PVC), then storage
+kubectl delete deployments --all -n tax-system --ignore-not-found --wait=true
+kubectl delete pvc taxsystem-data -n tax-system --ignore-not-found --wait=true
+kubectl delete pv taxsystem-data --ignore-not-found --wait=true
+
+# Apply namespace and storage first
 kubectl apply -f "$SCRIPT_DIR/k8s/storage.yaml"
 if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY (storage/namespace) FAILED"; exit 1; fi
 
 echo "  Waiting for namespace tax-system..."
 kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/tax-system --timeout=15s
 
-# Now apply the remaining manifests
-# Delete existing deployments first so old ReplicaSets/pods don't linger
-kubectl delete deployments --all -n tax-system --ignore-not-found
+# Apply all manifests (deployments, services, secrets, etc.)
 kubectl apply -f "$SCRIPT_DIR/k8s/"
 if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY FAILED"; exit 1; fi
 echo "✓ Manifests applied."
@@ -226,15 +226,15 @@ echo "✓ All pods ready."
 echo ""
 echo "[7/7] Running E2E tests..."
 
-# Get Client URL via Minikube
-CLIENT_BASE_URL=$(minikube service client -n tax-system --url)
-export CLIENT_BASE_URL
-echo "  CLIENT_BASE_URL = $CLIENT_BASE_URL"
-
-# Port-forward RabbitMQ in background
+# Port-forward Client and RabbitMQ in background
+kubectl port-forward service/client 38080:8080 -n tax-system &
+PF_CLIENT_PID=$!
 kubectl port-forward service/rabbitmq 35672:5672 -n tax-system &
-PF_PID=$!
+PF_RABBITMQ_PID=$!
 sleep 2
+
+export CLIENT_BASE_URL="http://localhost:38080"
+echo "  CLIENT_BASE_URL = $CLIENT_BASE_URL"
 
 export RABBITMQ_HOST="localhost"
 export RABBITMQ_PORT="35672"
@@ -243,8 +243,8 @@ export RABBITMQ_PASSWORD="guest"
 echo "  RABBITMQ = $RABBITMQ_HOST:$RABBITMQ_PORT"
 
 cleanup() {
-  kill $PF_PID 2>/dev/null || true
-  wait $PF_PID 2>/dev/null || true
+  kill $PF_CLIENT_PID $PF_RABBITMQ_PID 2>/dev/null || true
+  wait $PF_CLIENT_PID $PF_RABBITMQ_PID 2>/dev/null || true
 }
 trap cleanup EXIT
 
