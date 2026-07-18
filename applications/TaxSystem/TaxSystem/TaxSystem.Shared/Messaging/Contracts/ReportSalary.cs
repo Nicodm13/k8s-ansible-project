@@ -1,3 +1,3 @@
 namespace TaxSystem.Shared.Messaging.Contracts;
 
-public sealed record ReportSalary(string Cvr, string Cpr, string Name, decimal Salary);
+public sealed record ReportSalary(string Cvr, int Year, string Cpr, decimal Income);

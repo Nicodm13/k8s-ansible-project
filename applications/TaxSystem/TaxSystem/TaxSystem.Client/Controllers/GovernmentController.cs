@@ -9,9 +9,9 @@ using Microsoft.AspNetCore.Mvc;
 public class GovernmentController : ControllerBase
 {
     private readonly CitizenService _citizenService;
-    private readonly CompanyService _companyService;
+    private readonly CompanyClientService _companyService;
 
-    public GovernmentController(CitizenService citizenService, CompanyService companyservice)
+    public GovernmentController(CitizenService citizenService, CompanyClientService companyservice)
     {
         _citizenService = citizenService;
         _companyService = companyservice;
@@ -32,17 +32,17 @@ public class GovernmentController : ControllerBase
     }
 
     [HttpPost("Companies/{cvr}")]
-    public ActionResult RegisterCompany(Company company)
+    public async Task<ActionResult> RegisterCompany(Company company)
     {
         try
         {
-            _companyService.RegisterCompany(company);
-            return Ok("Company registered successfully.");
+            await _companyService.RegisterCompany(company);
+            return Accepted("Company registration requested.");
         }
         catch (Exception e)
         {
             Console.WriteLine(e);
-            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create Citizen.");
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to create company.");
         }
     }
 

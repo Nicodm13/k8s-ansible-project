@@ -13,15 +13,15 @@ using Microsoft.AspNetCore.Mvc;
 [Route("Company")]
 public class CompanyController : ControllerBase
 {
-    private readonly CompanyService _companyService;
+    private readonly CompanyClientService _companyService;
 
-    public CompanyController(CompanyService companyService)
+    public CompanyController(CompanyClientService companyService)
     {
         _companyService = companyService;
     }
 
     [HttpGet("{cvr}")]
-    public ActionResult<Company> GetCompanyInfo(string cvr)
+    public async Task<ActionResult<Company>> GetCompanyInfo(string cvr)
     {
         if (string.IsNullOrWhiteSpace(cvr))
         {
@@ -30,7 +30,12 @@ public class CompanyController : ControllerBase
 
         try
         {
-            var company = _companyService.getCompanyFromCvr(cvr);
+            var company = await _companyService.getCompanyFromCvr(cvr);
+            if (company is null)
+            {
+                return NotFound($"Company with CVR '{cvr}' was not found.");
+            }
+
             return Ok(company);
         }
 
@@ -45,7 +50,7 @@ public class CompanyController : ControllerBase
     }
 
     [HttpPost("{cvr}/employees/income/{year}/{cpr}")]
-    public ActionResult SetEmployeeIncomeForYear(string cvr, int year, int cpr, [FromBody] int income)
+    public async Task<ActionResult> SetEmployeeIncomeForYear(string cvr, int year, int cpr, [FromBody] int income)
     {
         if (string.IsNullOrWhiteSpace(cvr) || year <= 0 || cpr <= 0 || income < 0)
         {
@@ -54,7 +59,7 @@ public class CompanyController : ControllerBase
 
         try
         {
-            _companyService.SetEmployeeIncomeForYear(cvr, year, cpr, income);
+            await _companyService.SetEmployeeIncomeForYear(cvr, year, cpr, income);
             return Ok("Employee income reported successfully.");
         }
         catch (NotImplementedException)
@@ -65,6 +70,30 @@ public class CompanyController : ControllerBase
         {
             return StatusCode(StatusCodes.Status500InternalServerError, "Failed to report employee income.");
         }
+    }
+
+    [HttpPost]
+    public async Task<ActionResult> RegisterCompany([FromBody] Company company)
+    {
+        if (company is null || string.IsNullOrWhiteSpace(company.CVR) || string.IsNullOrWhiteSpace(company.Name))
+        {
+            return BadRequest("Company CVR and name are required.");
+        }
+
+        await _companyService.RegisterCompany(company);
+        return Accepted("Company registration requested.");
+    }
+
+    [HttpPut]
+    public async Task<ActionResult> UpdateCompany([FromBody] Company company)
+    {
+        if (company is null || string.IsNullOrWhiteSpace(company.CVR) || string.IsNullOrWhiteSpace(company.Name))
+        {
+            return BadRequest("Company CVR and name are required.");
+        }
+
+        await _companyService.UpdateCompany(company);
+        return Accepted("Company update requested.");
     }
 
 }

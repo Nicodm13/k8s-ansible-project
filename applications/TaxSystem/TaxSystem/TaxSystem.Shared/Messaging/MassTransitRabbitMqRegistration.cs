@@ -9,7 +9,8 @@ public static class MassTransitRabbitMqRegistration
 {
     public static IServiceCollection AddTaxSystemRabbitMq(
         this IServiceCollection services,
-        IConfiguration configuration)
+        IConfiguration configuration,
+        Action<IBusRegistrationConfigurator>? configure = null)
     {
         var options = RabbitMqOptions.FromConfiguration(configuration);
 
@@ -20,6 +21,8 @@ public static class MassTransitRabbitMqRegistration
             {
                 busRegistrationConfigurator.AddConsumers(entryAssembly);
             }
+
+            configure?.Invoke(busRegistrationConfigurator);
 
             busRegistrationConfigurator.UsingRabbitMq((context, rabbitMqConfigurator) =>
             {

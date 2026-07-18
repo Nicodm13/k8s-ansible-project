@@ -4,6 +4,7 @@ using Microsoft.Extensions.Hosting;
 using TaxSystem.CompanyService.Repositories;
 using TaxSystem.Shared.Messaging;
 using TaxSystem.Shared.Persistance;
+using BackendCompanyService = TaxSystem.CompanyService.Services.CompanyService;
 
 namespace TaxSystem.CompanyService;
 
@@ -20,6 +21,7 @@ internal class Program
             serviceProvider.GetRequiredService<CompanyRepository>());
         builder.Services.AddSingleton<IWriteCompanyRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<CompanyRepository>());
+        builder.Services.AddSingleton<BackendCompanyService>();
 
         var host = builder.Build();
 
