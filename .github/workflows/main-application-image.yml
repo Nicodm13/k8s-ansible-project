@@ -26,7 +26,7 @@ jobs:
 
     env:
       REGISTRY_PREFIX: ghcr.io/nicodm13/k8s-ansible-project
-      TAXSYSTEM_SOLUTION_DIR: applications/TaxSystem/TaxSystem
+      TAXSYSTEM_SOLUTION_DIR: applications/TaxSystem/src
       SOURCE_SHA: ${{ github.event_name == 'workflow_dispatch' && github.sha || github.event.workflow_run.head_sha }}
 
     steps:
