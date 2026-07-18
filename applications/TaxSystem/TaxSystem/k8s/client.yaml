@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: client
+  namespace: tax-system
   labels:
     app: client
 spec:
@@ -38,6 +39,7 @@ apiVersion: v1
 kind: Service
 metadata:
   name: client
+  namespace: tax-system
 spec:
   type: NodePort
   selector:

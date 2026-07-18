@@ -2,6 +2,7 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: citizen-service
+  namespace: tax-system
   labels:
     app: citizen-service
 spec:
@@ -19,6 +20,8 @@ spec:
           image: taxsystem-citizen-service:latest
           imagePullPolicy: Never
           env:
+            - name: TAXSYSTEM_DATA_PATH
+              value: "/var/lib/taxsystem"
             - name: RABBITMQ_HOST
               value: "rabbitmq"
             - name: RABBITMQ_PORT
@@ -27,11 +30,19 @@ spec:
               value: "guest"
             - name: RABBITMQ_PASSWORD
               value: "guest"
+          volumeMounts:
+            - name: taxsystem-data
+              mountPath: /var/lib/taxsystem
+      volumes:
+        - name: taxsystem-data
+          persistentVolumeClaim:
+            claimName: taxsystem-data
 ---
 apiVersion: v1
 kind: Service
 metadata:
   name: citizen-service
+  namespace: tax-system
 spec:
   selector:
     app: citizen-service
