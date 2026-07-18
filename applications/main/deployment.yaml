@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: main
-          image: ghcr.io/nicodm13/k8s-ansible-project/main:37f558cd1357d5c747d4cd3bb69882414b10982e
+          image: ghcr.io/nicodm13/k8s-ansible-project/main:54c5ee327cf914ea318f5596802b9900552e19ca
           imagePullPolicy: IfNotPresent
           ports:
             - name: http
