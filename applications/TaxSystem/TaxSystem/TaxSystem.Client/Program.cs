@@ -13,7 +13,6 @@ public class Program
         builder.Services.AddScoped<CompanyService>();
         builder.Services.AddScoped<TaxInfoService>();
         builder.Services.AddScoped<CitizenService>();
-        builder.Services.AddScoped<AuditService>();
         builder.Services.AddControllers();
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
