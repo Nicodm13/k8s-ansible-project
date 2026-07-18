@@ -17,7 +17,7 @@ public class CitizenService
 
     public Statement GetStatementByCitizenIdAndYear(int citizenId, int year)
     {
-        throw new NotImplementedException();
+        return _taxInfoService.GetStatementByCprAndYear(citizenId.ToString(), year);
     }
     
 
@@ -38,6 +38,8 @@ public class CitizenService
     /// <exception cref="InvalidOperationException">thrown if attempting to create a citizen that already exists</exception>
     public async Task<Citizen> createCitizen(Citizen citizen)
     {
+        _taxInfoService.RegisterCitizen(citizen);
+
         await _publishEndpoint.Publish(new CitizenRegistrationRequested(
             citizen.cpr,
             citizen.firstName,

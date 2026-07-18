@@ -30,9 +30,17 @@ public sealed class E2EStepDefinitions : IDisposable
     }
 
     [Given(@"a company with CVR ""(.*)""")]
-    public void GivenACompanyWithCvr(string cvr)
+    public async Task GivenACompanyWithCvr(string cvr)
     {
         _companyCvr = cvr;
+
+        await _httpClient.PostAsJsonAsync("/Company", new Company
+        {
+            CVR = cvr,
+            Name = $"Company {cvr}"
+        });
+
+        await WaitForCompanyLookupAsync(cvr);
     }
 
     [Given(@"a company named ""(.*)"" with CVR ""(.*)""")]
@@ -43,10 +51,22 @@ public sealed class E2EStepDefinitions : IDisposable
     }
 
     [Given(@"an employee named ""(.*)"" with CPR ""(.*)""")]
-    public void GivenAnEmployeeNamedWithCpr(string name, string cpr)
+    public async Task GivenAnEmployeeNamedWithCpr(string name, string cpr)
     {
         _employeeName = name;
         _employeeCpr = cpr;
+
+        var names = name.Split(' ', 2, StringSplitOptions.RemoveEmptyEntries);
+        await _httpClient.PostAsJsonAsync("/Citizen", new Citizen
+        {
+            cpr = cpr,
+            firstName = names.ElementAtOrDefault(0) ?? name,
+            lastName = names.ElementAtOrDefault(1) ?? string.Empty,
+            streetAddress = "Main Street 1",
+            city = "Copenhagen",
+            zipCode = "1000",
+            bankAccountNumber = "1234567890"
+        });
     }
 
     [Given(@"the employee's annual salary is reported as (\d+)")]
@@ -86,11 +106,8 @@ public sealed class E2EStepDefinitions : IDisposable
     [Then(@"the statement should contain ""(.*)"" and a gross income of (\d+)")]
     public async Task ThenTheStatementShouldContainAndAGrossIncomeOf(string name, int grossIncome)
     {
-        await Task.Delay(TimeSpan.FromSeconds(2));
-
         var year = DateTime.Now.Year;
-        var response = await _httpClient.GetAsync($"/Citizen/{_employeeCpr}/Statements/{year}");
-        var content = await response.Content.ReadAsStringAsync();
+        var (response, content) = await GetStatementWithRetryAsync(_employeeCpr!, year);
 
         Assert.That(response.IsSuccessStatusCode, Is.True,
             $"Expected success but got {response.StatusCode}: {content}");
@@ -101,11 +118,8 @@ public sealed class E2EStepDefinitions : IDisposable
     [Then(@"the report should contain ""(.*)"" and a gross income of (\d+)")]
     public async Task ThenTheReportShouldContainAndAGrossIncomeOf(string name, int grossIncome)
     {
-        await Task.Delay(TimeSpan.FromSeconds(2));
-
         var year = DateTime.Now.Year;
-        var response = await _httpClient.GetAsync($"/Citizen/{_employeeCpr}/Statements/{year}");
-        var content = await response.Content.ReadAsStringAsync();
+        var (response, content) = await GetStatementWithRetryAsync(_employeeCpr!, year);
 
         Assert.That(response.IsSuccessStatusCode, Is.True,
             $"Expected success but got {response.StatusCode}: {content}");
@@ -154,6 +168,40 @@ public sealed class E2EStepDefinitions : IDisposable
         Assert.That(company, Is.Not.Null, $"Expected company response body but got: {content}");
         Assert.That(company!.Name, Is.EqualTo(name));
         Assert.That(company.CVR, Is.EqualTo(cvr));
+    }
+
+    private async Task WaitForCompanyLookupAsync(string cvr)
+    {
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            var response = await _httpClient.GetAsync($"/Company/{cvr}");
+            if (response.IsSuccessStatusCode)
+            {
+                return;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+    }
+
+    private async Task<(HttpResponseMessage Response, string Content)> GetStatementWithRetryAsync(string cpr, int year)
+    {
+        HttpResponseMessage? response = null;
+        string content = string.Empty;
+
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            response = await _httpClient.GetAsync($"/Citizen/{cpr}/Statements/{year}");
+            content = await response.Content.ReadAsStringAsync();
+            if (response.IsSuccessStatusCode)
+            {
+                break;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+
+        return (response!, content);
     }
 
     public void Dispose()

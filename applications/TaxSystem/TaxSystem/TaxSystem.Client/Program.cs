@@ -12,7 +12,7 @@ public class Program
 
         // Add services to the container.
         builder.Services.AddScoped<CompanyClientService>();
-        builder.Services.AddScoped<TaxInfoService>();
+        builder.Services.AddSingleton<TaxInfoService>();
         builder.Services.AddScoped<CitizenService>();
         builder.Services.AddTaxSystemRabbitMq(builder.Configuration, registrationConfigurator =>
         {
