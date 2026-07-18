@@ -13,7 +13,7 @@ on:
 
 env:
   DOTNET_VERSION: '10.0.x'
-  SOLUTION_DIR: applications/TaxSystem/TaxSystem
+  SOLUTION_DIR: applications/TaxSystem/src
 
 jobs:
   service-tests:

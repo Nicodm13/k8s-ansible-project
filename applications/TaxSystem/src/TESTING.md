@@ -66,7 +66,7 @@ dotnet test TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj
 
 > **IMPORTANT**: The `.github/workflows/tests.yml` file must be placed at the
 > **repository root** (i.e., `k8s-ansible-project/.github/workflows/tests.yml`).
-> Copy it from `applications/TaxSystem/TaxSystem/.github/workflows/tests.yml`.
+> Copy it from `applications/TaxSystem/src/.github/workflows/tests.yml`.
 
 ### Jobs
 

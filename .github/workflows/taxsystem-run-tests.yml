@@ -4,13 +4,13 @@ on:
   workflow_dispatch:
   pull_request:
     paths:
-      - "applications/TaxSystem/**"
+      - "applications/TaxSystem/src/**"
       - ".github/workflows/taxsystem-run-tests.yml"
   push:
     branches:
       - main
     paths:
-      - "applications/TaxSystem/**"
+      - "applications/TaxSystem/src/**"
       - ".github/workflows/taxsystem-run-tests.yml"
 
 permissions:
@@ -40,5 +40,5 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          chmod +x applications/TaxSystem/TaxSystem/run-tests.sh
-          applications/TaxSystem/TaxSystem/run-tests.sh
+          chmod +x applications/TaxSystem/src/run-tests.sh
+          applications/TaxSystem/src/run-tests.sh
