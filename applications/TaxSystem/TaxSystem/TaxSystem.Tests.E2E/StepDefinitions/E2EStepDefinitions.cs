@@ -126,16 +126,23 @@ public sealed class E2EStepDefinitions : IDisposable
 
         for (var attempt = 0; attempt < 10; attempt++)
         {
-            response = await _httpClient.GetAsync($"/Company/{cvr}");
-            content = await response.Content.ReadAsStringAsync();
-
-            if (response.IsSuccessStatusCode)
+            try
             {
-                company = await response.Content.ReadFromJsonAsync<Company>();
-                if (company?.Name == name && company.CVR == cvr)
+                response = await _httpClient.GetAsync($"/Company/{cvr}");
+                content = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
                 {
-                    break;
+                    company = await response.Content.ReadFromJsonAsync<Company>();
+                    if (company?.Name == name && company.CVR == cvr)
+                    {
+                        break;
+                    }
                 }
+            }
+            catch (TaskCanceledException exception)
+            {
+                content = exception.Message;
             }
 
             await Task.Delay(TimeSpan.FromSeconds(1));
