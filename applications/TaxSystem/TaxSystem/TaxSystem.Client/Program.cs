@@ -31,6 +31,8 @@ public class Program
             app.MapOpenApi();
         }
 
+        app.MapGet("/healthz", () => Results.Ok());
+
         app.UseAuthorization();
 
 

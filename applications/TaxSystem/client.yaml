@@ -37,7 +37,7 @@ spec:
                   key: rabbitmq-password
           readinessProbe:
             httpGet:
-              path: /openapi/v1.json
+              path: /healthz
               port: 8080
             initialDelaySeconds: 10
             periodSeconds: 10
