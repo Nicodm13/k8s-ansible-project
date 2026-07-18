@@ -26,6 +26,9 @@ jobs:
       - Linux
       - X64
 
+    env:
+      KUBECONFIG: /etc/kubernetes/admin.conf
+
     steps:
       - name: Check out repository
         uses: actions/checkout@v7
@@ -37,32 +40,32 @@ jobs:
         run: |
           set -euo pipefail
 
-          kubectl version --client
-          kubectl get namespace flux-system
-          flux --version
+          sudo -n kubectl --kubeconfig="$KUBECONFIG" version --client
+          sudo -n kubectl --kubeconfig="$KUBECONFIG" get namespace flux-system
+          sudo -n flux --kubeconfig="$KUBECONFIG" --version
 
       - name: Reconcile Flux
         shell: bash
         run: |
           set -euo pipefail
 
-          flux reconcile source git flux-system \
+          sudo -n flux --kubeconfig="$KUBECONFIG" reconcile source git flux-system \
             --namespace flux-system
 
-          flux reconcile kustomization infrastructure \
+          sudo -n flux --kubeconfig="$KUBECONFIG" reconcile kustomization infrastructure \
             --namespace flux-system \
             --with-source
 
-          kubectl wait helmrelease/rabbitmq \
+          sudo -n kubectl --kubeconfig="$KUBECONFIG" wait helmrelease/rabbitmq \
             --namespace taxsystem \
             --for=condition=Ready \
             --timeout=5m
 
-          kubectl get secret rabbitmq \
+          sudo -n kubectl --kubeconfig="$KUBECONFIG" get secret rabbitmq \
             --namespace taxsystem \
             --output name
 
-          flux reconcile kustomization applications \
+          sudo -n flux --kubeconfig="$KUBECONFIG" reconcile kustomization applications \
             --namespace flux-system \
             --with-source
 
@@ -72,4 +75,4 @@ jobs:
         run: |
           set -euo pipefail
 
-          flux get kustomizations --namespace flux-system
+          sudo -n flux --kubeconfig="$KUBECONFIG" get kustomizations --namespace flux-system
