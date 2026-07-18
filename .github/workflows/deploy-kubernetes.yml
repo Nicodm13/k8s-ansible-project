@@ -6,7 +6,10 @@ on:
     branches:
       - main
     paths:
-      - "applications/**"
+      - "applications/*.yaml"
+      - "applications/grafana/*.yaml"
+      - "applications/main/*.yaml"
+      - "applications/TaxSystem/*.yaml"
       - "infrastructure/**"
       - "clusters/azure/flux/**"
       - ".github/workflows/deploy-kubernetes.yml"
