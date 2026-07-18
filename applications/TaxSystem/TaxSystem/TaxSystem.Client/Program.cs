@@ -1,6 +1,4 @@
 using TaxSystem.Client.Services;
-using TaxSystem.Shared.Messaging.Contracts;
-using TaxSystem.Shared.Messaging;
 
 namespace TaxSystem.Client;
 
@@ -11,7 +9,6 @@ public class Program
         var builder = WebApplication.CreateBuilder(args);
 
         // Add services to the container.
-
         builder.Services.AddScoped<CompanyClientService>();
         builder.Services.AddScoped<TaxInfoService>();
         builder.Services.AddScoped<CitizenService>();
@@ -20,6 +17,7 @@ public class Program
             registrationConfigurator.AddRequestClient<CompanyInfoRequested>();
         });
         builder.Services.AddControllers();
+        builder.Services.AddHealthChecks();
         // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
         builder.Services.AddOpenApi();
 
@@ -35,7 +33,7 @@ public class Program
 
         app.UseAuthorization();
 
-
+        app.MapHealthChecks("/healthz");
         app.MapControllers();
 
         app.Run();

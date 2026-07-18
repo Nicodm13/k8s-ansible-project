@@ -166,74 +166,75 @@ echo "✓ All images built (parallel)."
 echo ""
 echo "[5/7] Deploying K8s manifests..."
 
+# Clean up in the right order: deployments first (releases PVC), then storage
+kubectl delete deployments --all -n tax-system --ignore-not-found --wait=true
+kubectl delete pvc taxsystem-data -n tax-system --ignore-not-found --wait=true
+kubectl delete pv taxsystem-data --ignore-not-found --wait=true
+
+# Apply namespace and storage first
 kubectl apply -f "$SCRIPT_DIR/k8s/storage.yaml"
-if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY FAILED: storage"; exit 1; fi
+if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY (storage/namespace) FAILED"; exit 1; fi
 
-kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/tax-system --timeout=30s
-if [ $? -ne 0 ]; then echo "✗ NAMESPACE DID NOT BECOME ACTIVE"; exit 1; fi
+echo "  Waiting for namespace tax-system..."
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/tax-system --timeout=15s
 
-for manifest in \
-  rabbitmq.yaml \
-  bank-service.yaml \
-  citizen-service.yaml \
-  client.yaml \
-  company-service.yaml \
-  statementgenerator-service.yaml; do
-  kubectl apply -f "$SCRIPT_DIR/k8s/$manifest"
-  if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY FAILED: $manifest"; exit 1; fi
-done
+# Apply all manifests (deployments, services, secrets, etc.)
+kubectl apply -f "$SCRIPT_DIR/k8s/"
+if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY FAILED"; exit 1; fi
 echo "✓ Manifests applied."
 
 # ─── Step 6: Wait for pods ───────────────────────────────────────────────────
 
 echo ""
-echo "[6/7] Waiting for pods to be ready..."
+echo "[6/7] Waiting for all pods to be ready..."
 
-echo "  Waiting for RabbitMQ..."
-if ! kubectl wait --namespace tax-system --for=condition=ready pod -l app=rabbitmq --timeout=120s; then
-  echo "✗ RabbitMQ did not become ready"
-  kubectl get pods --namespace tax-system
+WAIT_TIMEOUT=45s
+ALL_READY=true
+
+# Wait for every pod in the namespace to become ready
+if ! kubectl wait --for=condition=ready pod --all -n tax-system --timeout="$WAIT_TIMEOUT"; then
+  ALL_READY=false
+  echo ""
+  echo "✗ Some pods did not become ready within $WAIT_TIMEOUT"
+  echo ""
+
+  # Show pod overview
+  echo "── Pod status ──────────────────────────────────────────"
+  kubectl get pods -n tax-system -o wide
+  echo ""
+
+  # Print logs and events for each non-ready pod
+  NOT_READY_PODS=$(kubectl get pods -n tax-system --no-headers \
+    | awk '$3 != "Running" || $2 !~ /^([0-9]+)\/\1$/ { print $1 }')
+
+  for pod in $NOT_READY_PODS; do
+    echo "── Describe pod/$pod ─────────────────────────────────"
+    kubectl describe pod "$pod" -n tax-system | tail -30
+    echo ""
+    echo "── Logs pod/$pod ─────────────────────────────────────"
+    kubectl logs "$pod" -n tax-system --tail=40 2>&1 || true
+    echo ""
+  done
+
   exit 1
 fi
 
-echo "  Waiting for Client..."
-if ! kubectl wait --namespace tax-system --for=condition=ready pod -l app=client --timeout=120s; then
-  echo "✗ Client pod did not become ready"
-  kubectl get pods --namespace tax-system
-  kubectl logs --namespace tax-system -l app=client --tail=50 2>/dev/null || true
-  exit 1
-fi
-
-for deployment in \
-  bank-service \
-  citizen-service \
-  company-service \
-  statementgenerator-service; do
-  echo "  Waiting for $deployment..."
-  if ! kubectl wait --namespace tax-system --for=condition=available deployment/$deployment --timeout=120s; then
-    echo "✗ $deployment did not become available"
-    kubectl get pods --namespace tax-system
-    kubectl logs --namespace tax-system -l app=$deployment --tail=50 2>/dev/null || true
-    exit 1
-  fi
-done
-
-echo "✓ Pods ready."
+echo "✓ All pods ready."
 
 # ─── Step 7: Run E2E tests ───────────────────────────────────────────────────
 
 echo ""
 echo "[7/7] Running E2E tests..."
 
-# Get Client URL via Minikube
-CLIENT_BASE_URL=$(minikube service --namespace tax-system client --url)
-export CLIENT_BASE_URL
-echo "  CLIENT_BASE_URL = $CLIENT_BASE_URL"
-
-# Port-forward RabbitMQ in background
-kubectl port-forward --namespace tax-system service/rabbitmq 35672:5672 &
-PF_PID=$!
+# Port-forward Client and RabbitMQ in background
+kubectl port-forward service/client 38080:8080 -n tax-system &
+PF_CLIENT_PID=$!
+kubectl port-forward service/rabbitmq 35672:5672 -n tax-system &
+PF_RABBITMQ_PID=$!
 sleep 2
+
+export CLIENT_BASE_URL="http://localhost:38080"
+echo "  CLIENT_BASE_URL = $CLIENT_BASE_URL"
 
 export RABBITMQ_HOST="localhost"
 export RABBITMQ_PORT="35672"
@@ -242,8 +243,8 @@ export RABBITMQ_PASSWORD="guest"
 echo "  RABBITMQ = $RABBITMQ_HOST:$RABBITMQ_PORT"
 
 cleanup() {
-  kill $PF_PID 2>/dev/null || true
-  wait $PF_PID 2>/dev/null || true
+  kill $PF_CLIENT_PID $PF_RABBITMQ_PID 2>/dev/null || true
+  wait $PF_CLIENT_PID $PF_RABBITMQ_PID 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -253,11 +254,8 @@ dotnet test "$SCRIPT_DIR/TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj" \
 if [ $? -ne 0 ]; then
   echo ""
   echo "✗ E2E TESTS FAILED"
-  kubectl get pods --namespace tax-system
-  for app in client company-service citizen-service bank-service statementgenerator-service rabbitmq; do
-    echo "--- logs: $app ---"
-    kubectl logs --namespace tax-system -l app=$app --tail=50 2>/dev/null || true
-  done
+  kubectl get pods
+  kubectl logs -l app=client --tail=30 2>/dev/null || true
   exit 1
 fi
 

@@ -27,9 +27,15 @@ spec:
             - name: RABBITMQ_PORT
               value: "5672"
             - name: RABBITMQ_USERNAME
-              value: "guest"
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: RABBITMQ_USERNAME
             - name: RABBITMQ_PASSWORD
-              value: "guest"
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq-credentials
+                  key: RABBITMQ_PASSWORD
             - name: ASPNETCORE_URLS
               value: "http://+:8080"
           readinessProbe:
