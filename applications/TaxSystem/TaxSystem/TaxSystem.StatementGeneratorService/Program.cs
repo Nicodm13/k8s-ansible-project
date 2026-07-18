@@ -1,4 +1,5 @@
-﻿using Microsoft.Extensions.Hosting;
+﻿using System.Threading.Tasks;
+using Microsoft.Extensions.Hosting;
 using TaxSystem.Shared.Messaging;
 
 namespace TaxSystem.StatementGenerator;

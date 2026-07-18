@@ -12,8 +12,4 @@
         <PackageReference Include="Microsoft.Extensions.DependencyInjection.Abstractions" Version="10.0.10" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Folder Include="Models\Topics\" />
-    </ItemGroup>
-
 </Project>
