@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: bank-service
-          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-bank-service:54c5ee327cf914ea318f5596802b9900552e19ca
+          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-bank-service:cae54befd72889b6cc88ad00f163d5798ff0d5c9
           imagePullPolicy: IfNotPresent
           env:
             - name: TAXSYSTEM_DATA_PATH
