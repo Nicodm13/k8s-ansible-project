@@ -30,8 +30,15 @@ public sealed class CitizenRegistrationRequestedConsumer : IConsumer<CitizenRegi
 
         await _citizenService.RegisterCitizenAsync(citizen);
 
-        await context.Publish(new CitizenRegistered(
+        var citizenRegistered = new CitizenRegistered(
             citizen.cpr,
-            $"{citizen.firstName} {citizen.lastName}"));
+            $"{citizen.firstName} {citizen.lastName}");
+
+        if (context.ResponseAddress is not null)
+        {
+            await context.RespondAsync(citizenRegistered);
+        }
+
+        await context.Publish(citizenRegistered);
     }
 }

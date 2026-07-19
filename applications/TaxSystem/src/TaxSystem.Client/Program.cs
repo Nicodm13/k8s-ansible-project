@@ -18,7 +18,7 @@ public class Program
         {
             registrationConfigurator.AddRequestClient<CompanyInfoRequested>();
             registrationConfigurator.AddRequestClient<CompanyRegistrationRequested>();
-            registrationConfigurator.AddEventAwaiter<CitizenRegistered>(builder.Services);
+            registrationConfigurator.AddRequestClient<CitizenRegistrationRequested>();
         });
         builder.Services.AddControllers();
         builder.Services.AddHealthChecks();

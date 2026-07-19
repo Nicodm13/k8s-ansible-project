@@ -38,19 +38,4 @@ public static class MassTransitRabbitMqRegistration
 
         return services;
     }
-
-    /// <summary>
-    /// Registers an <see cref="EventAwaiter{TEvent}"/> singleton and its
-    /// <see cref="EventAwaiterConsumer{TEvent}"/> so that any service can
-    /// publish a command and await a correlated response event.
-    /// Call inside the <c>configure</c> callback of <see cref="AddTaxSystemRabbitMq"/>.
-    /// </summary>
-    public static void AddEventAwaiter<TEvent>(
-        this IBusRegistrationConfigurator configurator,
-        IServiceCollection services)
-        where TEvent : class, ICorrelatedEvent
-    {
-        services.AddSingleton<EventAwaiter<TEvent>>();
-        configurator.AddConsumer<EventAwaiterConsumer<TEvent>>();
-    }
 }

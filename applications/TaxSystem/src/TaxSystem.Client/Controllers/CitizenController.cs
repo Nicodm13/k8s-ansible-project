@@ -1,3 +1,4 @@
+using MassTransit;
 using TaxSystem.Shared.Models;
 using TaxSystem.Client.Services;
 
@@ -119,7 +120,7 @@ public class CitizenController : ControllerBase
         {
             return Conflict(ex.Message);
         }
-        catch (TimeoutException ex)
+        catch (RequestTimeoutException ex)
         {
             return StatusCode(StatusCodes.Status504GatewayTimeout, ex.Message);
         }
