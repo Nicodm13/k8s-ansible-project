@@ -18,7 +18,10 @@ public class Program
         {
             registrationConfigurator.AddRequestClient<CompanyInfoRequested>();
             registrationConfigurator.AddRequestClient<CompanyRegistrationRequested>();
+            registrationConfigurator.AddRequestClient<CompanyDeregistrationRequested>();
             registrationConfigurator.AddRequestClient<CitizenRegistrationRequested>();
+            registrationConfigurator.AddRequestClient<CitizenInfoRequested>();
+            registrationConfigurator.AddRequestClient<CitizenDeregistrationRequested>();
         });
         builder.Services.AddControllers();
         builder.Services.AddHealthChecks();

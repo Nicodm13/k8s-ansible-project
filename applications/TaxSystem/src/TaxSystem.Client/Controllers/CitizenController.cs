@@ -16,6 +16,30 @@ public class CitizenController : ControllerBase
         _citizenClientService = citizenClientService;
     }
 
+    [HttpGet("{cpr}")]
+    public async Task<ActionResult<Citizen>> GetCitizenInfo(string cpr)
+    {
+        if (string.IsNullOrWhiteSpace(cpr))
+        {
+            return BadRequest("CPR is required.");
+        }
+
+        try
+        {
+            var citizen = await _citizenClientService.GetCitizenByCpr(cpr);
+            if (citizen is null)
+            {
+                return NotFound($"Citizen with CPR '{cpr}' was not found.");
+            }
+
+            return Ok(citizen);
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to fetch citizen info.");
+        }
+    }
+
     [HttpGet("{citizenId}/Statements/{statementId}")]
     public ActionResult<Statement> GetStatement(int citizenId, int statementId)
     {
@@ -127,6 +151,25 @@ public class CitizenController : ControllerBase
         catch (Exception)
         {
             return StatusCode(StatusCodes.Status500InternalServerError, "Failed to register citizen.");
+        }
+    }
+
+    [HttpDelete("{cpr}")]
+    public async Task<IActionResult> DeregisterCitizen(string cpr)
+    {
+        if (string.IsNullOrWhiteSpace(cpr))
+        {
+            return BadRequest("CPR is required.");
+        }
+
+        try
+        {
+            await _citizenClientService.DeregisterCitizen(cpr);
+            return Ok("Citizen deregistration requested.");
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to deregister citizen.");
         }
     }
 }

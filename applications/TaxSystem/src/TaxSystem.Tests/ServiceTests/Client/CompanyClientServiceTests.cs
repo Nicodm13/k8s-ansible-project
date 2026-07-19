@@ -48,6 +48,7 @@ public class CompanyClientServiceTests
         services.AddMassTransit(busRegistrationConfigurator =>
         {
             busRegistrationConfigurator.AddRequestClient<CompanyRegistrationRequested>();
+            busRegistrationConfigurator.AddRequestClient<CompanyDeregistrationRequested>();
             busRegistrationConfigurator.AddRequestClient<CompanyInfoRequested>();
             busRegistrationConfigurator.UsingInMemory((_, configurator) => configure(configurator));
         });

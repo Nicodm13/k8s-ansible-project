@@ -206,6 +206,30 @@ public sealed class E2EStepDefinitions : IDisposable
 
     public void Dispose()
     {
+        if (!string.IsNullOrWhiteSpace(_employeeCpr))
+        {
+            try
+            {
+                _httpClient.DeleteAsync($"/Citizen/{_employeeCpr}").GetAwaiter().GetResult();
+            }
+            catch
+            {
+                // Best-effort cleanup must not hide the scenario result.
+            }
+        }
+
+        if (!string.IsNullOrWhiteSpace(_companyCvr))
+        {
+            try
+            {
+                _httpClient.DeleteAsync($"/Company/{_companyCvr}").GetAwaiter().GetResult();
+            }
+            catch
+            {
+                // Best-effort cleanup must not hide the scenario result.
+            }
+        }
+
         _httpClient.Dispose();
     }
 }

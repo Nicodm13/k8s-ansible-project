@@ -186,6 +186,47 @@ public class CompanyServiceMessageFlowTests
         }
     }
 
+    [Test]
+    public async Task CompanyDeregistrationRequestDeletesCompanyAndPublishesDeregisteredEvent()
+    {
+        var deregistered = new TaskCompletionSource<CompanyDeregistered>();
+        await using var provider = BuildProvider(configurator =>
+        {
+            configurator.ReceiveEndpoint("company-deregistered-test", endpoint =>
+            {
+                endpoint.Handler<CompanyDeregistered>(context =>
+                {
+                    deregistered.SetResult(context.Message);
+                    return Task.CompletedTask;
+                });
+            });
+        });
+        var bus = provider.GetRequiredService<IBusControl>();
+        await provider.GetRequiredService<IWriteCompanyRepository>().SaveAsync(new Company
+        {
+            CVR = "12345678",
+            Name = "Acme Corp"
+        });
+
+        await bus.StartAsync();
+        try
+        {
+            using var scope = provider.CreateScope();
+            var client = scope.ServiceProvider.GetRequiredService<IRequestClient<CompanyDeregistrationRequested>>();
+            var response = await client.GetResponse<CompanyDeregistered>(new CompanyDeregistrationRequested("12345678"));
+            var message = await deregistered.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            var company = await provider.GetRequiredService<IReadCompanyRepository>().GetByCvrAsync("12345678");
+
+            Assert.That(response.Message, Is.EqualTo(new CompanyDeregistered("12345678")));
+            Assert.That(message, Is.EqualTo(new CompanyDeregistered("12345678")));
+            Assert.That(company, Is.Null);
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
+    }
+
     private ServiceProvider BuildProvider(Action<IInMemoryBusFactoryConfigurator> configure)
     {
         var services = new ServiceCollection();
@@ -204,6 +245,7 @@ public class CompanyServiceMessageFlowTests
             busRegistrationConfigurator.AddConsumer<CompanyInfoRequestedConsumer>();
             busRegistrationConfigurator.AddConsumer<ReportSalaryConsumer>();
             busRegistrationConfigurator.AddRequestClient<CompanyRegistrationRequested>();
+            busRegistrationConfigurator.AddRequestClient<CompanyDeregistrationRequested>();
             busRegistrationConfigurator.AddRequestClient<CompanyInfoRequested>();
             busRegistrationConfigurator.UsingInMemory((context, configurator) =>
             {

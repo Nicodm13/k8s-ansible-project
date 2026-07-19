@@ -18,11 +18,11 @@ public class GovernmentController : ControllerBase
     }
 
     [HttpPost("Citizens/{cpr}")]
-    public ActionResult RegisterCitizen(Citizen citizen)
+    public async Task<ActionResult> RegisterCitizen(Citizen citizen)
     {
         try
         {
-            _citizenClientService.createCitizen(citizen);
+            await _citizenClientService.createCitizen(citizen);
             return Ok("Citizen registered successfully.");
         }
         catch (Exception)
