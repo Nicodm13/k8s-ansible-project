@@ -76,7 +76,7 @@ public class StatementGeneratorService
             annualTax,
             owedTax);
 
-        var transfer = owedTax < 0m
+        var transfer = owedTax != 0m
             ? new ScheduleBankTransfer(cpr, Math.Abs(owedTax), citizenInfoReceived.Message.BankAccountNumber, string.Empty)
             : null;
 

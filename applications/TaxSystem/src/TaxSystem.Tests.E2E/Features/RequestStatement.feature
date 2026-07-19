@@ -6,4 +6,5 @@ Feature: Request Statement
     And the employee's annual salary is reported as 100000
     When the statement is generated
     Then the report should contain "Jane Doe" and a gross income of 100000
+    And a bank transfer of 37000 should be scheduled
 
