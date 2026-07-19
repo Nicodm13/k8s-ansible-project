@@ -9,15 +9,18 @@ public class CompanyClientService
     private readonly IPublishEndpoint _publishEndpoint;
     private readonly IRequestClient<CompanyInfoRequested> _companyInfoClient;
     private readonly IRequestClient<CompanyRegistrationRequested> _companyRegistrationClient;
+    private readonly IRequestClient<CompanyDeregistrationRequested> _companyDeregistrationClient;
 
     public CompanyClientService(
         IPublishEndpoint publishEndpoint,
         IRequestClient<CompanyInfoRequested> companyInfoClient,
-        IRequestClient<CompanyRegistrationRequested> companyRegistrationClient)
+        IRequestClient<CompanyRegistrationRequested> companyRegistrationClient,
+        IRequestClient<CompanyDeregistrationRequested> companyDeregistrationClient)
     {
         _publishEndpoint = publishEndpoint;
         _companyInfoClient = companyInfoClient;
         _companyRegistrationClient = companyRegistrationClient;
+        _companyDeregistrationClient = companyDeregistrationClient;
     }
 
     public async Task<Company?> getCompanyFromCvr(string cvr)
@@ -52,5 +55,10 @@ public class CompanyClientService
         ArgumentNullException.ThrowIfNull(company);
 
         await _publishEndpoint.Publish(new CompanyUpdateRequested(company.CVR, company.Name));
+    }
+
+    public async Task DeregisterCompany(string cvr)
+    {
+        await _companyDeregistrationClient.GetResponse<CompanyDeregistered>(new CompanyDeregistrationRequested(cvr));
     }
 }

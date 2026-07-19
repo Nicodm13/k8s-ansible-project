@@ -96,4 +96,16 @@ public class CompanyController : ControllerBase
         return Accepted("Company update requested.");
     }
 
+    [HttpDelete("{cvr}")]
+    public async Task<ActionResult> DeregisterCompany(string cvr)
+    {
+        if (string.IsNullOrWhiteSpace(cvr))
+        {
+            return BadRequest("CVR is required.");
+        }
+
+        await _companyService.DeregisterCompany(cvr);
+        return Ok("Company deregistration requested.");
+    }
+
 }

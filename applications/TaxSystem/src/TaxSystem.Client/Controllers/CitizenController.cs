@@ -1,3 +1,4 @@
+using MassTransit;
 using TaxSystem.Shared.Models;
 using TaxSystem.Client.Services;
 
@@ -8,11 +9,35 @@ using Microsoft.AspNetCore.Mvc;
 [Route("Citizen")]
 public class CitizenController : ControllerBase
 {
-    private readonly CitizenService _citizenService;
+    private readonly CitizenClientService _citizenClientService;
 
-    public CitizenController(CitizenService citizenService)
+    public CitizenController(CitizenClientService citizenClientService)
     {
-        _citizenService = citizenService;
+        _citizenClientService = citizenClientService;
+    }
+
+    [HttpGet("{cpr}")]
+    public async Task<ActionResult<Citizen>> GetCitizenInfo(string cpr)
+    {
+        if (string.IsNullOrWhiteSpace(cpr))
+        {
+            return BadRequest("CPR is required.");
+        }
+
+        try
+        {
+            var citizen = await _citizenClientService.GetCitizenByCpr(cpr);
+            if (citizen is null)
+            {
+                return NotFound($"Citizen with CPR '{cpr}' was not found.");
+            }
+
+            return Ok(citizen);
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to fetch citizen info.");
+        }
     }
 
     [HttpGet("{citizenId}/Statements/{statementId}")]
@@ -25,7 +50,7 @@ public class CitizenController : ControllerBase
 
         try
         {
-            var statement = _citizenService.GetStatementByCitizenIdAndYear(citizenId, statementId);
+            var statement = _citizenClientService.GetStatementByCitizenIdAndYear(citizenId, statementId);
             return Ok(statement);
         }
         catch (NotImplementedException)
@@ -48,7 +73,7 @@ public class CitizenController : ControllerBase
 
         try
         {
-            var statement = _citizenService.GetStatementByCitizenIdAndYear(citizenId, DateTime.Now.Year);
+            var statement = _citizenClientService.GetStatementByCitizenIdAndYear(citizenId, DateTime.Now.Year);
             return Ok(statement);
         }
         catch (NotImplementedException)
@@ -71,7 +96,7 @@ public class CitizenController : ControllerBase
 
         try
         {
-            _citizenService.ReportIncome(citizenId, year, income);
+            _citizenClientService.ReportIncome(citizenId, year, income);
             return Ok("Income reported successfully.");
         }
         catch (NotImplementedException)
@@ -94,7 +119,7 @@ public class CitizenController : ControllerBase
 
         try
         {
-            _citizenService.ReportDeductibles(citizenId, year, deductibles);
+            _citizenClientService.ReportDeductibles(citizenId, year, deductibles);
             return Ok("Deductibles reported successfully.");
         }
         catch (NotImplementedException)
@@ -112,16 +137,39 @@ public class CitizenController : ControllerBase
     {
         try
         {
-            var result = await _citizenService.createCitizen(citizen);
+            var result = await _citizenClientService.createCitizen(citizen);
             return Ok(result);
         }
         catch (InvalidOperationException ex)
         {
             return Conflict(ex.Message);
         }
+        catch (RequestTimeoutException ex)
+        {
+            return StatusCode(StatusCodes.Status504GatewayTimeout, ex.Message);
+        }
         catch (Exception)
         {
             return StatusCode(StatusCodes.Status500InternalServerError, "Failed to register citizen.");
+        }
+    }
+
+    [HttpDelete("{cpr}")]
+    public async Task<IActionResult> DeregisterCitizen(string cpr)
+    {
+        if (string.IsNullOrWhiteSpace(cpr))
+        {
+            return BadRequest("CPR is required.");
+        }
+
+        try
+        {
+            await _citizenClientService.DeregisterCitizen(cpr);
+            return Ok("Citizen deregistration requested.");
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to deregister citizen.");
         }
     }
 }

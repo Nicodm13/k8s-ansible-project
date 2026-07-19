@@ -16,6 +16,13 @@ public class CompanyDeregistrationRequestedConsumer : IConsumer<CompanyDeregistr
     public async Task Consume(ConsumeContext<CompanyDeregistrationRequested> context)
     {
         await _companyService.DeregisterCompanyAsync(context.Message.Cvr);
-        await context.Publish(new CompanyDeregistered(context.Message.Cvr));
+        var companyDeregistered = new CompanyDeregistered(context.Message.Cvr);
+
+        if (context.ResponseAddress is not null)
+        {
+            await context.RespondAsync(companyDeregistered);
+        }
+
+        await context.Publish(companyDeregistered);
     }
 }

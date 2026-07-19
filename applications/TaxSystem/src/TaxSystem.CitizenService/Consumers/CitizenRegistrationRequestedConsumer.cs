@@ -1,5 +1,4 @@
 using MassTransit;
-using TaxSystem.CitizenService.Repositories;
 using TaxSystem.Shared.Messaging.Contracts;
 using TaxSystem.Shared.Models;
 
@@ -7,11 +6,11 @@ namespace TaxSystem.CitizenService.Consumers;
 
 public sealed class CitizenRegistrationRequestedConsumer : IConsumer<CitizenRegistrationRequested>
 {
-    private readonly IWriteCitizenRepository _writeCitizenRepository;
+    private readonly Services.CitizenService _citizenService;
 
-    public CitizenRegistrationRequestedConsumer(IWriteCitizenRepository writeCitizenRepository)
+    public CitizenRegistrationRequestedConsumer(Services.CitizenService citizenService)
     {
-        _writeCitizenRepository = writeCitizenRepository;
+        _citizenService = citizenService;
     }
 
     public async Task Consume(ConsumeContext<CitizenRegistrationRequested> context)
@@ -29,7 +28,17 @@ public sealed class CitizenRegistrationRequestedConsumer : IConsumer<CitizenRegi
             bankAccountNumber = message.BankAccountNumber
         };
 
-        await _writeCitizenRepository.SaveAsync(citizen);
+        await _citizenService.RegisterCitizenAsync(citizen);
+
+        var citizenRegistered = new CitizenRegistered(
+            citizen.cpr,
+            $"{citizen.firstName} {citizen.lastName}");
+
+        if (context.ResponseAddress is not null)
+        {
+            await context.RespondAsync(citizenRegistered);
+        }
+
+        await context.Publish(citizenRegistered);
     }
 }
-
