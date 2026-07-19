@@ -3,9 +3,6 @@ name: Run Tests
 on:
   workflow_dispatch:
   pull_request:
-    paths:
-      - "applications/TaxSystem/src/**"
-      - ".github/workflows/taxsystem-run-tests.yml"
       
 permissions:
   contents: read
