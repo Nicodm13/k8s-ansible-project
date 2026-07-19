@@ -19,6 +19,7 @@ internal class Program
             serviceProvider.GetRequiredService<BankRepository>());
         builder.Services.AddSingleton<IBankWriteRepository>(serviceProvider =>
             serviceProvider.GetRequiredService<BankRepository>());
+        builder.Services.AddSingleton<Services.BankService>();
 
         var host = builder.Build();
 

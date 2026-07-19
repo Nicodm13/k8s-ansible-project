@@ -127,6 +127,18 @@ public sealed class E2EStepDefinitions : IDisposable
         Assert.That(content, Does.Contain(grossIncome.ToString()));
     }
 
+    [Then(@"a bank transfer of (\d+) should be scheduled")]
+    public async Task ThenABankTransferOfShouldBeScheduled(int amount)
+    {
+        var (response, content) = await GetBankTransferWithRetryAsync(_employeeCpr!);
+
+        Assert.That(response.IsSuccessStatusCode, Is.True,
+            $"Expected success but got {response.StatusCode}: {content}");
+        Assert.That(content, Does.Contain(_employeeCpr!));
+        Assert.That(content, Does.Contain(amount.ToString()));
+        Assert.That(content, Does.Contain("Scheduled"));
+    }
+
     [Then(@"the company lookup should return ""(.*)"" with CVR ""(.*)""")]
     public async Task ThenTheCompanyLookupShouldReturnWithCvr(string name, string cvr)
     {
@@ -191,7 +203,27 @@ public sealed class E2EStepDefinitions : IDisposable
 
         for (var attempt = 0; attempt < 10; attempt++)
         {
-            response = await _httpClient.GetAsync($"/Citizen/{cpr}/Statements/{year}");
+            response = await _httpClient.GetAsync($"/StatementGenerator/{cpr}/Statements/{year}");
+            content = await response.Content.ReadAsStringAsync();
+            if (response.IsSuccessStatusCode)
+            {
+                break;
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+
+        return (response!, content);
+    }
+
+    private async Task<(HttpResponseMessage Response, string Content)> GetBankTransferWithRetryAsync(string cpr)
+    {
+        HttpResponseMessage? response = null;
+        string content = string.Empty;
+
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            response = await _httpClient.GetAsync($"/Bank/transfers/{cpr}");
             content = await response.Content.ReadAsStringAsync();
             if (response.IsSuccessStatusCode)
             {

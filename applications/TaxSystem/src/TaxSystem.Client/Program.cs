@@ -12,7 +12,8 @@ public class Program
 
         // Add services to the container.
         builder.Services.AddScoped<CompanyClientService>();
-        builder.Services.AddSingleton<TaxInfoService>();
+        builder.Services.AddScoped<BankClientService>();
+        builder.Services.AddScoped<StatementGeneratorClientService>();
         builder.Services.AddScoped<CitizenClientService>();
         builder.Services.AddTaxSystemRabbitMq(builder.Configuration, registrationConfigurator =>
         {
@@ -22,6 +23,8 @@ public class Program
             registrationConfigurator.AddRequestClient<CitizenRegistrationRequested>();
             registrationConfigurator.AddRequestClient<CitizenInfoRequested>();
             registrationConfigurator.AddRequestClient<CitizenDeregistrationRequested>();
+            registrationConfigurator.AddRequestClient<GenerateTaxStatement>();
+            registrationConfigurator.AddRequestClient<BankTransferInfoRequested>();
         });
         builder.Services.AddControllers();
         builder.Services.AddHealthChecks();
