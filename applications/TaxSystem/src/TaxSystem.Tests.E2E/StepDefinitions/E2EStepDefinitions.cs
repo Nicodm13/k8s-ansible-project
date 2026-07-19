@@ -191,7 +191,7 @@ public sealed class E2EStepDefinitions : IDisposable
 
         for (var attempt = 0; attempt < 10; attempt++)
         {
-            response = await _httpClient.GetAsync($"/Citizen/{cpr}/Statements/{year}");
+            response = await _httpClient.GetAsync($"/StatementGenerator/{cpr}/Statements/{year}");
             content = await response.Content.ReadAsStringAsync();
             if (response.IsSuccessStatusCode)
             {

@@ -40,54 +40,8 @@ public class CitizenController : ControllerBase
         }
     }
 
-    [HttpGet("{citizenId}/Statements/{statementId}")]
-    public ActionResult<Statement> GetStatement(int citizenId, int statementId)
-    {
-        if (citizenId <= 0 || statementId <= 0)
-        {
-            return BadRequest("Citizen ID and Statement ID must be greater than 0.");
-        }
-
-        try
-        {
-            var statement = _citizenClientService.GetStatementByCitizenIdAndYear(citizenId, statementId);
-            return Ok(statement);
-        }
-        catch (NotImplementedException)
-        {
-            return StatusCode(StatusCodes.Status501NotImplemented, "Statement retrieval is not implemented yet.");
-        }
-        catch (Exception)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to fetch statement.");
-        }
-    }
-
-    [HttpGet("{citizenId}/Statements/latest")]
-    public ActionResult<Statement> GetStatementLatest(int citizenId)
-    {
-        if (citizenId <= 0)
-        {
-            return BadRequest("Citizen ID must be greater than 0.");
-        }
-
-        try
-        {
-            var statement = _citizenClientService.GetStatementByCitizenIdAndYear(citizenId, DateTime.Now.Year);
-            return Ok(statement);
-        }
-        catch (NotImplementedException)
-        {
-            return StatusCode(StatusCodes.Status501NotImplemented, "Latest statement retrieval is not implemented yet.");
-        }
-        catch (Exception)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to fetch latest statement.");
-        }
-    }
-
     [HttpPost("{citizenId}/income/{year}")]
-    public IActionResult ReportIncome(int citizenId, int year, [FromBody] int income)
+    public async Task<IActionResult> ReportIncome(int citizenId, int year, [FromBody] int income)
     {
         if (citizenId <= 0 || year <= 0 || income < 0)
         {
@@ -96,7 +50,7 @@ public class CitizenController : ControllerBase
 
         try
         {
-            _citizenClientService.ReportIncome(citizenId, year, income);
+            await _citizenClientService.ReportIncome(citizenId, year, income);
             return Ok("Income reported successfully.");
         }
         catch (NotImplementedException)

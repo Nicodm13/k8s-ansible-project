@@ -6,21 +6,21 @@ namespace TaxSystem.Client.Services;
 
 public class CitizenClientService
 {
-    private readonly TaxInfoService _taxInfoService;
     private readonly IRequestClient<CitizenRegistrationRequested> _citizenRegistrationClient;
     private readonly IRequestClient<CitizenInfoRequested> _citizenInfoClient;
     private readonly IRequestClient<CitizenDeregistrationRequested> _citizenDeregistrationClient;
+    private readonly IPublishEndpoint _publishEndpoint;
 
     public CitizenClientService(
-        TaxInfoService taxInfoService,
         IRequestClient<CitizenRegistrationRequested> citizenRegistrationClient,
         IRequestClient<CitizenInfoRequested> citizenInfoClient,
-        IRequestClient<CitizenDeregistrationRequested> citizenDeregistrationClient)
+        IRequestClient<CitizenDeregistrationRequested> citizenDeregistrationClient,
+        IPublishEndpoint publishEndpoint)
     {
-        _taxInfoService = taxInfoService;
         _citizenRegistrationClient = citizenRegistrationClient;
         _citizenInfoClient = citizenInfoClient;
         _citizenDeregistrationClient = citizenDeregistrationClient;
+        _publishEndpoint = publishEndpoint;
     }
 
     public async Task<Citizen?> GetCitizenByCpr(string cpr)
@@ -45,20 +45,18 @@ public class CitizenClientService
         return null;
     }
 
-    public Statement GetStatementByCitizenIdAndYear(int citizenId, int year)
+    public async Task ReportIncome(int citizenId, int year, int income)
     {
-        return _taxInfoService.GetStatementByCprAndYear(citizenId.ToString(), year);
-    }
-    
-
-    public void ReportIncome(int citizenId, int year, int income)
-    {
-        _taxInfoService.setIncomeByCprAndYear(income, citizenId, year, "CitizenReport");
+        var citizen = await GetCitizenByCpr(citizenId.ToString());
+        var name = citizen is null
+            ? string.Empty
+            : $"{citizen.firstName} {citizen.lastName}".Trim();
+        await _publishEndpoint.Publish(new TaxInfoReported(citizenId.ToString(), name, income, 0m, 0m, 0m));
     }
 
     public void ReportDeductibles(int citizenId, int year, IEnumerable<Deductible> deductibles)
     {
-        _taxInfoService.setDeductiblesByCprAndYear(deductibles, citizenId, year, "CitizenReport");
+        throw new NotImplementedException();
     }
     
     /// <summary>
@@ -78,8 +76,6 @@ public class CitizenClientService
                 citizen.city,
                 citizen.zipCode,
                 citizen.bankAccountNumber));
-
-        _taxInfoService.RegisterCitizen(citizen);
 
         return citizen;
     }
