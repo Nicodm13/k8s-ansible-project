@@ -8,11 +8,35 @@ using Microsoft.AspNetCore.Mvc;
 [Route("Citizen")]
 public class CitizenController : ControllerBase
 {
-    private readonly CitizenService _citizenService;
+    private readonly CitizenClientService _citizenService;
 
-    public CitizenController(CitizenService citizenService)
+    public CitizenController(CitizenClientService citizenService)
     {
         _citizenService = citizenService;
+    }
+
+    [HttpGet("{cpr}")]
+    public async Task<ActionResult<Citizen>> GetCitizenInfo(string cpr)
+    {
+        if (string.IsNullOrWhiteSpace(cpr))
+        {
+            return BadRequest("CPR is required.");
+        }
+
+        try
+        {
+            var citizen = await _citizenService.GetCitizenByCpr(cpr);
+            if (citizen is null)
+            {
+                return NotFound($"Citizen with CPR '{cpr}' was not found.");
+            }
+
+            return Ok(citizen);
+        }
+        catch (Exception)
+        {
+            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to fetch citizen info.");
+        }
     }
 
     [HttpGet("{citizenId}/Statements/{statementId}")]

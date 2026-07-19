@@ -4,15 +4,42 @@ using TaxSystem.Shared.Models;
 
 namespace TaxSystem.Client.Services;
 
-public class CitizenService
+public class CitizenClientService
 {
     private readonly TaxInfoService _taxInfoService;
-    private readonly IPublishEndpoint _publishEndpoint;
+    private readonly IRequestClient<CitizenRegistrationRequested> _citizenRegistrationClient;
+    private readonly IRequestClient<CitizenInfoRequested> _citizenInfoClient;
 
-    public CitizenService(TaxInfoService taxInfoService, IPublishEndpoint publishEndpoint)
+    public CitizenClientService(
+        TaxInfoService taxInfoService,
+        IRequestClient<CitizenRegistrationRequested> citizenRegistrationClient,
+        IRequestClient<CitizenInfoRequested> citizenInfoClient)
     {
         _taxInfoService = taxInfoService;
-        _publishEndpoint = publishEndpoint;
+        _citizenRegistrationClient = citizenRegistrationClient;
+        _citizenInfoClient = citizenInfoClient;
+    }
+
+    public async Task<Citizen?> GetCitizenByCpr(string cpr)
+    {
+        var response = await _citizenInfoClient.GetResponse<CitizenInfoReceived, CitizenInfoNotFound>(
+            new CitizenInfoRequested(cpr));
+
+        if (response.Is(out Response<CitizenInfoReceived>? citizenInfoReceived))
+        {
+            return new Citizen
+            {
+                cpr = citizenInfoReceived.Message.Cpr,
+                firstName = citizenInfoReceived.Message.FirstName,
+                lastName = citizenInfoReceived.Message.LastName,
+                streetAddress = citizenInfoReceived.Message.StreetAddress,
+                city = citizenInfoReceived.Message.City,
+                zipCode = citizenInfoReceived.Message.ZipCode,
+                bankAccountNumber = citizenInfoReceived.Message.BankAccountNumber
+            };
+        }
+
+        return null;
     }
 
     public Statement GetStatementByCitizenIdAndYear(int citizenId, int year)
@@ -38,9 +65,7 @@ public class CitizenService
     /// <exception cref="InvalidOperationException">thrown if attempting to create a citizen that already exists</exception>
     public async Task<Citizen> createCitizen(Citizen citizen)
     {
-        _taxInfoService.RegisterCitizen(citizen);
-
-        await _publishEndpoint.Publish(new CitizenRegistrationRequested(
+        await _citizenRegistrationClient.GetResponse<CitizenRegistered>(new CitizenRegistrationRequested(
             citizen.cpr,
             citizen.firstName,
             citizen.lastName,
@@ -48,6 +73,8 @@ public class CitizenService
             citizen.city,
             citizen.zipCode,
             citizen.bankAccountNumber));
+
+        _taxInfoService.RegisterCitizen(citizen);
 
         return citizen;
     }

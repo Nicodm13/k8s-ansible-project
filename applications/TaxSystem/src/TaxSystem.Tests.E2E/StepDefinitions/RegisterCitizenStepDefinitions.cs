@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Text.Json;
 using TaxSystem.Shared.Models;
 
 namespace TaxSystem.Tests.E2E.StepDefinitions;
@@ -14,7 +13,11 @@ public sealed class RegisterCitizenStepDefinitions : IDisposable
     public RegisterCitizenStepDefinitions()
     {
         var baseUrl = Environment.GetEnvironmentVariable("CLIENT_BASE_URL") ?? "http://localhost:8080";
-        _httpClient = new HttpClient { BaseAddress = new Uri(baseUrl) };
+        _httpClient = new HttpClient
+        {
+            BaseAddress = new Uri(baseUrl),
+            Timeout = TimeSpan.FromSeconds(30)
+        };
     }
 
     [Given(@"a citizen with CPR ""(.*)"" named ""(.*)"" ""(.*)"" living at ""(.*)"", ""(.*)"", ""(.*)"" with bank account ""(.*)""")]
@@ -45,12 +48,37 @@ public sealed class RegisterCitizenStepDefinitions : IDisposable
             $"Expected 200 but got {(int)_response.StatusCode}");
     }
 
-    [Then(@"the response body should contain CPR ""(.*)""")]
-    public async Task ThenTheResponseBodyShouldContainCpr(string expectedCpr)
+    [Then(@"the citizen lookup should return ""(.*)"" ""(.*)"" with CPR ""(.*)""")]
+    public async Task ThenTheCitizenLookupShouldReturnWithCpr(string firstName, string lastName, string cpr)
     {
-        var content = await _response!.Content.ReadAsStringAsync();
-        Assert.That(content, Does.Contain(expectedCpr),
-            $"Expected response to contain CPR '{expectedCpr}' but got: {content}");
+        Citizen? citizen = null;
+        string content = string.Empty;
+        HttpResponseMessage? response = null;
+
+        for (var attempt = 0; attempt < 10; attempt++)
+        {
+            response = await _httpClient.GetAsync($"/Citizen/{cpr}");
+            content = await response.Content.ReadAsStringAsync();
+
+            if (response.IsSuccessStatusCode)
+            {
+                citizen = await response.Content.ReadFromJsonAsync<Citizen>();
+                if (citizen?.cpr == cpr && citizen.firstName == firstName && citizen.lastName == lastName)
+                {
+                    break;
+                }
+            }
+
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response!.IsSuccessStatusCode, Is.True,
+            $"Expected citizen lookup to succeed but got {response.StatusCode}: {content}");
+        Assert.That(citizen, Is.Not.Null, $"Expected citizen response body but got: {content}");
+        Assert.That(citizen!.cpr, Is.EqualTo(cpr));
+        Assert.That(citizen.firstName, Is.EqualTo(firstName));
+        Assert.That(citizen.lastName, Is.EqualTo(lastName));
     }
 
     public void Dispose()

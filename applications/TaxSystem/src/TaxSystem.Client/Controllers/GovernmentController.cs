@@ -8,21 +8,21 @@ using Microsoft.AspNetCore.Mvc;
 [Route("Government")]
 public class GovernmentController : ControllerBase
 {
-    private readonly CitizenService _citizenService;
+    private readonly CitizenClientService _citizenService;
     private readonly CompanyClientService _companyService;
 
-    public GovernmentController(CitizenService citizenService, CompanyClientService companyservice)
+    public GovernmentController(CitizenClientService citizenService, CompanyClientService companyservice)
     {
         _citizenService = citizenService;
         _companyService = companyservice;
     }
 
     [HttpPost("Citizens/{cpr}")]
-    public ActionResult RegisterCitizen(Citizen citizen)
+    public async Task<ActionResult> RegisterCitizen(Citizen citizen)
     {
         try
         {
-            _citizenService.createCitizen(citizen);
+            await _citizenService.createCitizen(citizen);
             return Ok("Citizen registered successfully.");
         }
         catch (Exception)
