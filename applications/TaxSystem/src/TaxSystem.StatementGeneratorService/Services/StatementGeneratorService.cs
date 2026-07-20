@@ -24,24 +24,25 @@ public class StatementGeneratorService
     {
         var statement = new Statement
         {
+            reportId = Guid.NewGuid().ToString("N"),
+            reportedAt = DateTime.UtcNow,
+            cpr = taxInfo.Cpr,
             name = taxInfo.Name,
-            annualGrossSalary = FormatDecimal(taxInfo.AnnualGrossSalary),
-            annualCapitalGains = FormatDecimal(taxInfo.AnnualCapitalGains),
-            annualTotalDeduction = FormatDecimal(taxInfo.AnnualTotalDeduction),
-            annualPaidTax = FormatDecimal(taxInfo.AnnualPaidTax),
-            annualTax = string.Empty,
-            annualOwedTax = string.Empty
+            annualGrossSalary = FormatNullableDecimal(taxInfo.AnnualGrossSalary),
+            annualCapitalGains = FormatNullableDecimal(taxInfo.AnnualCapitalGains),
+            annualTotalDeduction = FormatNullableDecimal(taxInfo.AnnualTotalDeduction),
+            annualPaidTax = FormatNullableDecimal(taxInfo.AnnualPaidTax)
         };
 
-        await _writeStatementRepository.SaveAsync(taxInfo.Cpr, statement);
+        await _writeStatementRepository.SaveReportAsync(taxInfo.Cpr, statement);
     }
 
     public async Task<StatementGenerationResult> GenerateStatementAsync(
         string cpr,
         IRequestClient<CitizenInfoRequested> citizenInfoClient)
     {
-        var statement = await _readStatementRepository.GetByCprAsync(cpr);
-        if (statement is null)
+        var statement = await _readStatementRepository.GetMergedStatementAsync(cpr);
+        if (statement is null || statement.annualGrossSalary is null || statement.annualPaidTax is null)
         {
             return StatementGenerationResult.NotReady(new StatementNotReady(cpr, "Tax info has not been reported"));
         }
@@ -55,20 +56,17 @@ public class StatementGeneratorService
 
         var name = $"{citizenInfoReceived.Message.FirstName} {citizenInfoReceived.Message.LastName}".Trim();
         var grossSalary = ParseDecimal(statement.annualGrossSalary);
-        var capitalGains = ParseDecimal(statement.annualCapitalGains);
-        var totalDeduction = ParseDecimal(statement.annualTotalDeduction);
+        var capitalGains = ParseDecimalOrZero(statement.annualCapitalGains);
+        var totalDeduction = ParseDecimalOrZero(statement.annualTotalDeduction);
         var paidTax = ParseDecimal(statement.annualPaidTax);
         var annualTax = Math.Max(0m, (grossSalary + capitalGains - totalDeduction) * TaxRate);
         var owedTax = annualTax - paidTax;
 
-        statement.name = string.IsNullOrWhiteSpace(statement.name) ? name : statement.name;
-        statement.annualTax = FormatDecimal(annualTax);
-        statement.annualOwedTax = FormatDecimal(owedTax);
-        await _writeStatementRepository.SaveAsync(cpr, statement);
+        var finalName = string.IsNullOrWhiteSpace(statement.name) ? name : statement.name;
 
         var generated = new StatementGenerated(
             cpr,
-            statement.name,
+            finalName,
             grossSalary,
             capitalGains,
             totalDeduction,
@@ -88,9 +86,14 @@ public class StatementGeneratorService
         return decimal.Parse(value, CultureInfo.InvariantCulture);
     }
 
-    private static string FormatDecimal(decimal value)
+    private static decimal ParseDecimalOrZero(string? value)
     {
-        return value.ToString("0.#############################", CultureInfo.InvariantCulture);
+        return string.IsNullOrEmpty(value) ? 0m : decimal.Parse(value, CultureInfo.InvariantCulture);
+    }
+
+    private static string? FormatNullableDecimal(decimal? value)
+    {
+        return value?.ToString("0.#############################", CultureInfo.InvariantCulture);
     }
 }
 

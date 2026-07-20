@@ -4,5 +4,5 @@ using TaxSystem.Shared.Models;
 
 public interface IWriteStatementRepository
 {
-    Task SaveAsync(string cpr, Statement statement);
+    Task SaveReportAsync(string cpr, Statement statement);
 }

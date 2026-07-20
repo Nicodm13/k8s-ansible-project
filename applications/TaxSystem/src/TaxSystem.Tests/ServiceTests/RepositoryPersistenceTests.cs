@@ -99,6 +99,8 @@ public class RepositoryPersistenceTests
         var cpr = "0101011234";
         var statement = new Statement
         {
+            cpr = cpr,
+            reportedAt = DateTime.UtcNow,
             annualGrossSalary = "100000",
             annualCapitalGains = "1000",
             annualTotalDeduction = "5000",
@@ -107,9 +109,9 @@ public class RepositoryPersistenceTests
             annualOwedTax = "5000"
         };
 
-        await writeRepository.SaveAsync(cpr, statement);
+        await writeRepository.SaveReportAsync(cpr, statement);
 
-        var persistedStatement = await readRepository.GetByCprAsync(cpr);
+        var persistedStatement = await readRepository.GetMergedStatementAsync(cpr);
         Assert.That(persistedStatement, Is.Not.Null);
         Assert.That(persistedStatement!.annualGrossSalary, Is.EqualTo(statement.annualGrossSalary));
         Assert.That(persistedStatement.annualOwedTax, Is.EqualTo(statement.annualOwedTax));
