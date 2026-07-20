@@ -54,6 +54,8 @@ spec:
     initdb:
       database: taxsystem
       owner: taxsystem
+      secret:
+        name: taxsystem-db-app-credentials
       postInitSQL:
         - CREATE DATABASE citizen_db OWNER taxsystem;
         - CREATE DATABASE company_db OWNER taxsystem;

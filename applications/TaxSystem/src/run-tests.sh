@@ -217,57 +217,26 @@ echo "✓ Manifests applied."
 echo ""
 echo "[6/7] Waiting for all pods to be ready..."
 
-WAIT_TIMEOUT=90s
-ALL_READY=true
+# Wait for our application deployments + database pods to be ready
+# (ignores transient CNPG init/join job pods)
+APP_LABELS="app=client,app=citizen-service,app=company-service,app=bank-service,app=statementgenerator-service,app=rabbitmq"
+DB_LABEL="cnpg.io/cluster=taxsystem-db,cnpg.io/instanceRole"
 
-# Wait for pods to be ready, ignoring Completed (Succeeded) pods like init jobs
-echo "  Waiting up to $WAIT_TIMEOUT for pods..."
-END_TIME=$((SECONDS + 90))
-while [ $SECONDS -lt $END_TIME ]; do
-  # Get pods that are NOT Running/Succeeded
-  NOT_DONE=$(kubectl get pods -n tax-system --no-headers 2>/dev/null \
-    | awk '$3 != "Running" && $3 != "Completed" && $3 != "Succeeded" { print $1 }')
-
-  if [ -z "$NOT_DONE" ]; then
-    # All pods are either Running or Completed — now check Running ones are Ready
-    NOT_READY=$(kubectl get pods -n tax-system --no-headers 2>/dev/null \
-      | awk '$3 == "Running" && $2 !~ /^([0-9]+)\/\1$/ { print $1 }')
-    if [ -z "$NOT_READY" ]; then
-      break
+echo "  Waiting for application pods..."
+if ! kubectl wait --for=condition=ready pod -l app -n tax-system --timeout=90s 2>/dev/null; then
+  # Fallback: try individual waits
+  for app in client citizen-service company-service bank-service statementgenerator-service rabbitmq; do
+    if ! kubectl wait --for=condition=ready pod -l "app=$app" -n tax-system --timeout=60s; then
+      echo "✗ Pod for $app is not ready"
+      kubectl get pods -n tax-system -o wide
+      kubectl logs -l "app=$app" -n tax-system --tail=30 2>&1 || true
+      exit 1
     fi
-  fi
-  sleep 2
-done
-
-# Final check
-NOT_DONE=$(kubectl get pods -n tax-system --no-headers 2>/dev/null \
-  | awk '$3 != "Running" && $3 != "Completed" && $3 != "Succeeded" { print $1 }')
-NOT_READY=$(kubectl get pods -n tax-system --no-headers 2>/dev/null \
-  | awk '$3 == "Running" && $2 !~ /^([0-9]+)\/\1$/ { print $1 }')
-
-if [ -n "$NOT_DONE" ] || [ -n "$NOT_READY" ]; then
-  ALL_READY=false
-  echo ""
-  echo "✗ Some pods did not become ready within $WAIT_TIMEOUT"
-  echo ""
-
-  # Show pod overview
-  echo "── Pod status ──────────────────────────────────────────"
-  kubectl get pods -n tax-system -o wide
-  echo ""
-
-  # Print logs and events for each problematic pod
-  for pod in $NOT_DONE $NOT_READY; do
-    echo "── Describe pod/$pod ─────────────────────────────────"
-    kubectl describe pod "$pod" -n tax-system | tail -30
-    echo ""
-    echo "── Logs pod/$pod ─────────────────────────────────────"
-    kubectl logs "$pod" -n tax-system --tail=40 2>&1 || true
-    echo ""
   done
-
-  exit 1
 fi
+
+echo "  Waiting for database pods..."
+kubectl wait --for=condition=ready pod -l "cnpg.io/cluster=taxsystem-db" -n tax-system --timeout=30s 2>/dev/null || true
 
 echo "✓ All pods ready."
 
