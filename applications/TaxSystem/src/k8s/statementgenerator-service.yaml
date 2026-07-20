@@ -20,11 +20,16 @@ spec:
           image: taxsystem-statementgenerator-service:latest
           imagePullPolicy: Never
           env:
-            - name: TAXSYSTEM_DB_CONNECTION
+            - name: TAXSYSTEM_DB_CONNECTION_WRITE
               valueFrom:
                 secretKeyRef:
                   name: postgres-credentials
-                  key: STATEMENT_DB_CONNECTION
+                  key: STATEMENT_DB_CONNECTION_WRITE
+            - name: TAXSYSTEM_DB_CONNECTION_READ
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: STATEMENT_DB_CONNECTION_READ
             - name: RABBITMQ_HOST
               value: "rabbitmq"
             - name: RABBITMQ_PORT

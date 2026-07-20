@@ -166,19 +166,48 @@ echo "✓ All images built (parallel)."
 echo ""
 echo "[5/7] Deploying K8s manifests..."
 
-# Clean up in the right order: deployments first (releases PVC), then storage
+# Clean up existing deployments
 kubectl delete deployments --all -n tax-system --ignore-not-found --wait=true
-kubectl delete pvc taxsystem-data -n tax-system --ignore-not-found --wait=true
-kubectl delete pv taxsystem-data --ignore-not-found --wait=true
+kubectl delete statefulsets --all -n tax-system --ignore-not-found --wait=true
+kubectl delete cluster taxsystem-db -n tax-system --ignore-not-found --wait=true 2>/dev/null || true
 
-# Apply namespace and storage first
-kubectl apply -f "$SCRIPT_DIR/k8s/storage.yaml"
-if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY (storage/namespace) FAILED"; exit 1; fi
+# Wait for all CNPG pods to fully terminate before redeploying
+echo "  Waiting for old database pods to terminate..."
+kubectl wait --for=delete pod -l cnpg.io/cluster=taxsystem-db -n tax-system --timeout=60s 2>/dev/null || true
 
+# Install CloudNativePG operator (idempotent)
+echo "  Installing CloudNativePG operator..."
+kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.25/releases/cnpg-1.25.1.yaml 2>/dev/null
+kubectl wait --for=condition=Available deployment/cnpg-controller-manager -n cnpg-system --timeout=60s
+if [ $? -ne 0 ]; then echo "✗ CloudNativePG operator not ready"; exit 1; fi
+echo "  ✓ CloudNativePG operator ready."
+
+# Ensure namespace exists
+kubectl apply -f "$SCRIPT_DIR/k8s/cnpg-operator-install.yaml"
+kubectl create namespace tax-system --dry-run=client -o yaml | kubectl apply -f -
 echo "  Waiting for namespace tax-system..."
 kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/tax-system --timeout=15s
 
-# Apply all manifests (deployments, services, secrets, etc.)
+# Apply credentials first (needed by cluster and services)
+kubectl apply -f "$SCRIPT_DIR/k8s/postgres-credentials.yaml"
+kubectl apply -f "$SCRIPT_DIR/k8s/rabbitmq-credentials.yaml"
+
+# Deploy PostgreSQL cluster
+echo "  Pre-pulling CloudNativePG PostgreSQL image..."
+docker pull ghcr.io/cloudnative-pg/postgresql:16.4 || true
+echo "  Deploying PostgreSQL cluster..."
+kubectl apply -f "$SCRIPT_DIR/k8s/postgres-cluster.yaml"
+echo "  Waiting for PostgreSQL cluster to be ready (up to 120s)..."
+kubectl wait --for=condition=Ready cluster/taxsystem-db -n tax-system --timeout=120s
+if [ $? -ne 0 ]; then
+  echo "✗ PostgreSQL cluster not ready"
+  kubectl get cluster -n tax-system
+  kubectl get pods -n tax-system -l cnpg.io/cluster=taxsystem-db
+  exit 1
+fi
+echo "  ✓ PostgreSQL cluster ready."
+
+# Apply all remaining manifests (deployments, services, etc.)
 kubectl apply -f "$SCRIPT_DIR/k8s/"
 if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY FAILED"; exit 1; fi
 echo "✓ Manifests applied."
@@ -188,11 +217,35 @@ echo "✓ Manifests applied."
 echo ""
 echo "[6/7] Waiting for all pods to be ready..."
 
-WAIT_TIMEOUT=45s
+WAIT_TIMEOUT=90s
 ALL_READY=true
 
-# Wait for every pod in the namespace to become ready
-if ! kubectl wait --for=condition=ready pod --all -n tax-system --timeout="$WAIT_TIMEOUT"; then
+# Wait for pods to be ready, ignoring Completed (Succeeded) pods like init jobs
+echo "  Waiting up to $WAIT_TIMEOUT for pods..."
+END_TIME=$((SECONDS + 90))
+while [ $SECONDS -lt $END_TIME ]; do
+  # Get pods that are NOT Running/Succeeded
+  NOT_DONE=$(kubectl get pods -n tax-system --no-headers 2>/dev/null \
+    | awk '$3 != "Running" && $3 != "Completed" && $3 != "Succeeded" { print $1 }')
+
+  if [ -z "$NOT_DONE" ]; then
+    # All pods are either Running or Completed — now check Running ones are Ready
+    NOT_READY=$(kubectl get pods -n tax-system --no-headers 2>/dev/null \
+      | awk '$3 == "Running" && $2 !~ /^([0-9]+)\/\1$/ { print $1 }')
+    if [ -z "$NOT_READY" ]; then
+      break
+    fi
+  fi
+  sleep 2
+done
+
+# Final check
+NOT_DONE=$(kubectl get pods -n tax-system --no-headers 2>/dev/null \
+  | awk '$3 != "Running" && $3 != "Completed" && $3 != "Succeeded" { print $1 }')
+NOT_READY=$(kubectl get pods -n tax-system --no-headers 2>/dev/null \
+  | awk '$3 == "Running" && $2 !~ /^([0-9]+)\/\1$/ { print $1 }')
+
+if [ -n "$NOT_DONE" ] || [ -n "$NOT_READY" ]; then
   ALL_READY=false
   echo ""
   echo "✗ Some pods did not become ready within $WAIT_TIMEOUT"
@@ -203,11 +256,8 @@ if ! kubectl wait --for=condition=ready pod --all -n tax-system --timeout="$WAIT
   kubectl get pods -n tax-system -o wide
   echo ""
 
-  # Print logs and events for each non-ready pod
-  NOT_READY_PODS=$(kubectl get pods -n tax-system --no-headers \
-    | awk '$3 != "Running" || $2 !~ /^([0-9]+)\/\1$/ { print $1 }')
-
-  for pod in $NOT_READY_PODS; do
+  # Print logs and events for each problematic pod
+  for pod in $NOT_DONE $NOT_READY; do
     echo "── Describe pod/$pod ─────────────────────────────────"
     kubectl describe pod "$pod" -n tax-system | tail -30
     echo ""
