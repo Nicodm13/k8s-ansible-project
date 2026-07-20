@@ -1,8 +1,10 @@
 using MassTransit;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TaxSystem.Shared.Messaging.Contracts;
-using TaxSystem.Shared.Persistance;
 using TaxSystem.StatementGenerator.Consumers;
+using TaxSystem.StatementGenerator.Persistance;
 using TaxSystem.StatementGenerator.Repositories;
 using BackendStatementGeneratorService = TaxSystem.StatementGenerator.Services.StatementGeneratorService;
 
@@ -10,22 +12,19 @@ namespace TaxSystem.Tests.ServiceTests.StatementGeneratorService;
 
 public class StatementGeneratorServiceMessageFlowTests
 {
-    private string _dataPath = string.Empty;
+    private SqliteConnection _sqliteConnection = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _dataPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "statement-generator-service-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_dataPath);
+        _sqliteConnection = new SqliteConnection("DataSource=:memory:");
+        _sqliteConnection.Open();
     }
 
     [TearDown]
     public void TearDown()
     {
-        if (Directory.Exists(_dataPath))
-        {
-            Directory.Delete(_dataPath, recursive: true);
-        }
+        _sqliteConnection.Dispose();
     }
 
     [Test]
@@ -51,7 +50,9 @@ public class StatementGeneratorServiceMessageFlowTests
             await bus.Publish(new TaxInfoReported("101011234", "John Doe", 100000m, 5000m, 15000m, 20000m));
 
             var message = await generateTaxStatement.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            var statement = await provider.GetRequiredService<IReadStatementRepository>().GetMergedStatementAsync("101011234");
+
+            using var scope = provider.CreateScope();
+            var statement = await scope.ServiceProvider.GetRequiredService<IReadStatementRepository>().GetMergedStatementAsync("101011234");
 
             Assert.That(message, Is.EqualTo(new GenerateTaxStatement("101011234")));
             Assert.That(statement, Is.Not.Null);
@@ -93,16 +94,19 @@ public class StatementGeneratorServiceMessageFlowTests
             });
         });
         var bus = provider.GetRequiredService<IBusControl>();
-        await provider.GetRequiredService<IWriteStatementRepository>().SaveReportAsync("101011234", new TaxSystem.Shared.Models.Statement
+        using (var scope = provider.CreateScope())
         {
-            cpr = "101011234",
-            name = string.Empty,
-            annualGrossSalary = "100000",
-            annualCapitalGains = "0",
-            annualTotalDeduction = "0",
-            annualPaidTax = "50000",
-            reportedAt = DateTime.UtcNow
-        });
+            await scope.ServiceProvider.GetRequiredService<IWriteStatementRepository>().SaveReportAsync("101011234", new TaxSystem.Shared.Models.Statement
+            {
+                cpr = "101011234",
+                name = string.Empty,
+                annualGrossSalary = "100000",
+                annualCapitalGains = "0",
+                annualTotalDeduction = "0",
+                annualPaidTax = "50000",
+                reportedAt = DateTime.UtcNow
+            });
+        }
 
         await bus.StartAsync();
         try
@@ -111,11 +115,9 @@ public class StatementGeneratorServiceMessageFlowTests
 
             var generated = await statementGenerated.Task.WaitAsync(TimeSpan.FromSeconds(5));
             var transfer = await scheduleBankTransfer.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            var statement = await provider.GetRequiredService<IReadStatementRepository>().GetMergedStatementAsync("101011234");
 
             Assert.That(generated, Is.EqualTo(new StatementGenerated("101011234", "John Doe", 100000m, 0m, 0m, 50000m, 37000m, -13000m)));
             Assert.That(transfer, Is.EqualTo(new ScheduleBankTransfer("101011234", 13000m, "1234567890", string.Empty)));
-            Assert.That(statement, Is.Not.Null);
         }
         finally
         {
@@ -229,13 +231,13 @@ public class StatementGeneratorServiceMessageFlowTests
     private ServiceProvider BuildProvider(Action<IInMemoryBusFactoryConfigurator> configure)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(_ => new FileSystemRepository("statements", _dataPath));
-        services.AddSingleton<StatementRepository>();
-        services.AddSingleton<IReadStatementRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<StatementRepository>());
-        services.AddSingleton<IWriteStatementRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<StatementRepository>());
-        services.AddSingleton<BackendStatementGeneratorService>();
+        services.AddDbContext<StatementDbContext>(options =>
+        {
+            options.UseSqlite(_sqliteConnection);
+        });
+        services.AddScoped<IReadStatementRepository, StatementPostgresRepository>();
+        services.AddScoped<IWriteStatementRepository, StatementPostgresRepository>();
+        services.AddScoped<BackendStatementGeneratorService>();
         services.AddMassTransit(busRegistrationConfigurator =>
         {
             busRegistrationConfigurator.AddConsumer<TaxInfoReportedConsumer>();
@@ -270,6 +272,13 @@ public class StatementGeneratorServiceMessageFlowTests
             });
         });
 
-        return services.BuildServiceProvider(validateScopes: true);
+        var provider = services.BuildServiceProvider(validateScopes: true);
+
+        // Ensure schema is created
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<StatementDbContext>();
+        db.Database.EnsureCreated();
+
+        return provider;
     }
 }

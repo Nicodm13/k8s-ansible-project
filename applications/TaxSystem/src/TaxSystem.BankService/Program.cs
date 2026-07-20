@@ -1,5 +1,7 @@
-﻿using Microsoft.Extensions.DependencyInjection;
+﻿using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using TaxSystem.BankService.Persistance;
 using TaxSystem.BankService.Repositories;
 using TaxSystem.Shared.Messaging;
 using TaxSystem.Shared.Persistance;
@@ -13,15 +15,18 @@ internal class Program
         var builder = Host.CreateApplicationBuilder(args);
 
         builder.Services.AddTaxSystemRabbitMq(builder.Configuration);
-        builder.Services.AddSingleton(_ => new FileSystemRepository("bank-transfers"));
-        builder.Services.AddSingleton<BankRepository>();
-        builder.Services.AddSingleton<IBankReadRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<BankRepository>());
-        builder.Services.AddSingleton<IBankWriteRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<BankRepository>());
-        builder.Services.AddSingleton<Services.BankService>();
+        builder.Services.AddTaxSystemPostgres<BankDbContext>();
+        builder.Services.AddScoped<IBankReadRepository, BankPostgresRepository>();
+        builder.Services.AddScoped<IBankWriteRepository, BankPostgresRepository>();
+        builder.Services.AddScoped<Services.BankService>();
 
         var host = builder.Build();
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<BankDbContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
 
         await host.RunAsync();
     }

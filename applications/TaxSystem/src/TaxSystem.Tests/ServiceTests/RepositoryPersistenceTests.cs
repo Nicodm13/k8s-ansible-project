@@ -1,36 +1,45 @@
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
+using TaxSystem.BankService.Persistance;
 using TaxSystem.BankService.Repositories;
+using TaxSystem.CitizenService.Persistance;
 using TaxSystem.CitizenService.Repositories;
+using TaxSystem.CompanyService.Persistance;
 using TaxSystem.CompanyService.Repositories;
 using TaxSystem.Shared.Models;
-using TaxSystem.Shared.Persistance;
+using TaxSystem.StatementGenerator.Persistance;
 using TaxSystem.StatementGenerator.Repositories;
 
 namespace TaxSystem.Tests.ServiceTests;
 
 public class RepositoryPersistenceTests
 {
-    private string _dataPath = string.Empty;
+    private SqliteConnection _connection = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _dataPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "repository-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_dataPath);
+        _connection = new SqliteConnection("DataSource=:memory:");
+        _connection.Open();
     }
 
     [TearDown]
     public void TearDown()
     {
-        if (Directory.Exists(_dataPath))
-        {
-            Directory.Delete(_dataPath, recursive: true);
-        }
+        _connection.Dispose();
     }
 
     [Test]
     public async Task CitizenServiceRepositoryPersistsCitizen()
     {
-        var repository = new CitizenRepository(new FileSystemRepository("citizens", _dataPath));
+        var options = new DbContextOptionsBuilder<CitizenDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+
+        await using var dbContext = new CitizenDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new CitizenPostgresRepository(dbContext);
         IReadCitizenRepository readRepository = repository;
         IWriteCitizenRepository writeRepository = repository;
         var citizen = new Citizen
@@ -54,7 +63,14 @@ public class RepositoryPersistenceTests
     [Test]
     public async Task CompanyServiceRepositoryPersistsCompany()
     {
-        var repository = new CompanyRepository(new FileSystemRepository("companies", _dataPath));
+        var options = new DbContextOptionsBuilder<CompanyDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+
+        await using var dbContext = new CompanyDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new CompanyPostgresRepository(dbContext);
         IReadCompanyRepository readRepository = repository;
         IWriteCompanyRepository writeRepository = repository;
         var company = new Company
@@ -74,7 +90,14 @@ public class RepositoryPersistenceTests
     [Test]
     public async Task BankServiceRepositoryPersistsBankTransfer()
     {
-        var repository = new BankRepository(new FileSystemRepository("bank-transfers", _dataPath));
+        var options = new DbContextOptionsBuilder<BankDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+
+        await using var dbContext = new BankDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new BankPostgresRepository(dbContext);
         IBankReadRepository readRepository = repository;
         IBankWriteRepository writeRepository = repository;
         var transfer = new BankTransfer(
@@ -93,7 +116,14 @@ public class RepositoryPersistenceTests
     [Test]
     public async Task StatementGeneratorServiceRepositoryPersistsStatement()
     {
-        var repository = new StatementRepository(new FileSystemRepository("statements", _dataPath));
+        var options = new DbContextOptionsBuilder<StatementDbContext>()
+            .UseSqlite(_connection)
+            .Options;
+
+        await using var dbContext = new StatementDbContext(options);
+        await dbContext.Database.EnsureCreatedAsync();
+
+        var repository = new StatementPostgresRepository(dbContext);
         IReadStatementRepository readRepository = repository;
         IWriteStatementRepository writeRepository = repository;
         var cpr = "0101011234";

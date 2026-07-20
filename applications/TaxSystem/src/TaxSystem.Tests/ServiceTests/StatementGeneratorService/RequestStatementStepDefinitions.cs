@@ -1,8 +1,10 @@
 using MassTransit;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TaxSystem.Shared.Messaging.Contracts;
-using TaxSystem.Shared.Persistance;
 using TaxSystem.StatementGenerator.Consumers;
+using TaxSystem.StatementGenerator.Persistance;
 using TaxSystem.StatementGenerator.Repositories;
 using BackendStatementGeneratorService = TaxSystem.StatementGenerator.Services.StatementGeneratorService;
 
@@ -18,7 +20,7 @@ public sealed class RequestStatementStepDefinitions : IDisposable
     private readonly ScenarioContext _scenarioContext;
     private StatementGenerated? _statementGenerated;
     private StatementNotReady? _statementNotReady;
-    private string _dataPath = string.Empty;
+    private SqliteConnection? _sqliteConnection;
 
     public RequestStatementStepDefinitions(ScenarioContext scenarioContext)
     {
@@ -41,8 +43,8 @@ public sealed class RequestStatementStepDefinitions : IDisposable
         var name = _scenarioContext["EmployeeName"] as string
             ?? throw new InvalidOperationException("Employee name is missing from the scenario context.");
 
-        _dataPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "request-statement-bdd", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_dataPath);
+        _sqliteConnection = new SqliteConnection("DataSource=:memory:");
+        _sqliteConnection.Open();
 
         var statementGenerated = new TaskCompletionSource<StatementGenerated>();
         var statementNotReady = new TaskCompletionSource<StatementNotReady>();
@@ -165,10 +167,7 @@ public sealed class RequestStatementStepDefinitions : IDisposable
 
     public void Dispose()
     {
-        if (!string.IsNullOrEmpty(_dataPath) && Directory.Exists(_dataPath))
-        {
-            Directory.Delete(_dataPath, recursive: true);
-        }
+        _sqliteConnection?.Dispose();
     }
 
     private ServiceProvider BuildProvider(
@@ -177,11 +176,13 @@ public sealed class RequestStatementStepDefinitions : IDisposable
         string name)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(_ => new FileSystemRepository("statements", _dataPath));
-        services.AddSingleton<StatementRepository>();
-        services.AddSingleton<IReadStatementRepository>(sp => sp.GetRequiredService<StatementRepository>());
-        services.AddSingleton<IWriteStatementRepository>(sp => sp.GetRequiredService<StatementRepository>());
-        services.AddSingleton<BackendStatementGeneratorService>();
+        services.AddDbContext<StatementDbContext>(options =>
+        {
+            options.UseSqlite(_sqliteConnection!);
+        });
+        services.AddScoped<IReadStatementRepository, StatementPostgresRepository>();
+        services.AddScoped<IWriteStatementRepository, StatementPostgresRepository>();
+        services.AddScoped<BackendStatementGeneratorService>();
         services.AddMassTransit(busRegistrationConfigurator =>
         {
             busRegistrationConfigurator.AddConsumer<TaxInfoReportedConsumer>();
@@ -207,7 +208,13 @@ public sealed class RequestStatementStepDefinitions : IDisposable
             });
         });
 
-        return services.BuildServiceProvider(validateScopes: true);
+        var provider = services.BuildServiceProvider(validateScopes: true);
+
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<StatementDbContext>();
+        db.Database.EnsureCreated();
+
+        return provider;
     }
 }
 
