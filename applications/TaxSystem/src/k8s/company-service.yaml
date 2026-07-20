@@ -20,8 +20,16 @@ spec:
           image: taxsystem-company-service:latest
           imagePullPolicy: Never
           env:
-            - name: TAXSYSTEM_DATA_PATH
-              value: "/var/lib/taxsystem"
+            - name: TAXSYSTEM_DB_CONNECTION_WRITE
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: COMPANY_DB_CONNECTION_WRITE
+            - name: TAXSYSTEM_DB_CONNECTION_READ
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: COMPANY_DB_CONNECTION_READ
             - name: RABBITMQ_HOST
               value: "rabbitmq"
             - name: RABBITMQ_PORT
@@ -36,13 +44,6 @@ spec:
                 secretKeyRef:
                   name: rabbitmq-credentials
                   key: RABBITMQ_PASSWORD
-          volumeMounts:
-            - name: taxsystem-data
-              mountPath: /var/lib/taxsystem
-      volumes:
-        - name: taxsystem-data
-          persistentVolumeClaim:
-            claimName: taxsystem-data
 ---
 apiVersion: v1
 kind: Service

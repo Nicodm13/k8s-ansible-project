@@ -1,6 +1,8 @@
 ﻿using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using TaxSystem.CitizenService.Persistance;
 using TaxSystem.CitizenService.Repositories;
 using TaxSystem.Shared.Messaging;
 using TaxSystem.Shared.Persistance;
@@ -14,15 +16,18 @@ internal class Program
         var builder = Host.CreateApplicationBuilder(args);
 
         builder.Services.AddTaxSystemRabbitMq(builder.Configuration);
-        builder.Services.AddSingleton(_ => new FileSystemRepository("citizens"));
-        builder.Services.AddSingleton<CitizenRepository>();
-        builder.Services.AddSingleton<IReadCitizenRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<CitizenRepository>());
-        builder.Services.AddSingleton<IWriteCitizenRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<CitizenRepository>());
-        builder.Services.AddSingleton<Services.CitizenService>();
+        builder.Services.AddTaxSystemPostgres<CitizenDbContext>();
+        builder.Services.AddScoped<IReadCitizenRepository, CitizenPostgresRepository>();
+        builder.Services.AddScoped<IWriteCitizenRepository, CitizenPostgresRepository>();
+        builder.Services.AddScoped<Services.CitizenService>();
 
         var host = builder.Build();
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CitizenDbContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
 
         await host.RunAsync();
     }

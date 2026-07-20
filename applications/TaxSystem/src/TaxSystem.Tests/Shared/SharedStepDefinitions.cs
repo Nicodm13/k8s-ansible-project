@@ -27,12 +27,17 @@ public sealed class SharedStepDefinitions
     {
         _scenarioContext["EmployeeName"] = name;
         _scenarioContext["EmployeeCpr"] = cpr;
+        if (!_scenarioContext.ContainsKey("GivenOrder"))
+            _scenarioContext["GivenOrder"] = new List<string>();
     }
 
-    [Given(@"the employee's annual salary is reported as (\d+)")]
-    public void GivenTheEmployeesAnnualSalaryIsReportedAs(int salary)
+    [Given(@"the employee's annual salary is reported as (\d+) with a paid tax of (\d+)")]
+    public void GivenTheEmployeesAnnualSalaryIsReportedAs(int salary, int paidTax)
     {
         _scenarioContext["Salary"] = salary;
+        _scenarioContext["PaidTax"] = paidTax;
+        var order = (List<string>)_scenarioContext["GivenOrder"];
+        order.Add("Salary");
     }
 }
 

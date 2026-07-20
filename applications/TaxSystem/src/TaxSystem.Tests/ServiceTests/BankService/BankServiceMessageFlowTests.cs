@@ -1,31 +1,30 @@
 using MassTransit;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TaxSystem.BankService.Consumers;
+using TaxSystem.BankService.Persistance;
 using TaxSystem.BankService.Repositories;
 using TaxSystem.Shared.Messaging.Contracts;
-using TaxSystem.Shared.Persistance;
 using BackendBankService = TaxSystem.BankService.Services.BankService;
 
 namespace TaxSystem.Tests.ServiceTests.BankService;
 
 public class BankServiceMessageFlowTests
 {
-    private string _dataPath = string.Empty;
+    private SqliteConnection _sqliteConnection = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _dataPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "bank-service-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_dataPath);
+        _sqliteConnection = new SqliteConnection("DataSource=:memory:");
+        _sqliteConnection.Open();
     }
 
     [TearDown]
     public void TearDown()
     {
-        if (Directory.Exists(_dataPath))
-        {
-            Directory.Delete(_dataPath, recursive: true);
-        }
+        _sqliteConnection.Dispose();
     }
 
     [Test]
@@ -51,7 +50,9 @@ public class BankServiceMessageFlowTests
             await bus.Publish(new ScheduleBankTransfer("101011234", 13000m, "1234567890", "1234"));
 
             var message = await bankTransferScheduled.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            var transfer = await provider.GetRequiredService<IBankReadRepository>().GetByCprAsync("101011234");
+
+            using var scope = provider.CreateScope();
+            var transfer = await scope.ServiceProvider.GetRequiredService<IBankReadRepository>().GetByCprAsync("101011234");
 
             Assert.That(message, Is.EqualTo(new BankTransferScheduled("101011234", 13000m, "1234567890", "1234")));
             Assert.That(transfer, Is.Not.Null);
@@ -72,12 +73,15 @@ public class BankServiceMessageFlowTests
     {
         await using var provider = BuildProvider(_ => { });
         var bus = provider.GetRequiredService<IBusControl>();
-        await provider.GetRequiredService<IBankWriteRepository>().SaveAsync(new TaxSystem.Shared.Models.BankTransfer(
-            "101011234",
-            13000m,
-            "1234567890",
-            "1234",
-            "Scheduled"));
+        using (var setupScope = provider.CreateScope())
+        {
+            await setupScope.ServiceProvider.GetRequiredService<IBankWriteRepository>().SaveAsync(new TaxSystem.Shared.Models.BankTransfer(
+                "101011234",
+                13000m,
+                "1234567890",
+                "1234",
+                "Scheduled"));
+        }
 
         await bus.StartAsync();
         try
@@ -123,13 +127,13 @@ public class BankServiceMessageFlowTests
     private ServiceProvider BuildProvider(Action<IInMemoryBusFactoryConfigurator> configure)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(_ => new FileSystemRepository("bank-transfers", _dataPath));
-        services.AddSingleton<BankRepository>();
-        services.AddSingleton<IBankReadRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<BankRepository>());
-        services.AddSingleton<IBankWriteRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<BankRepository>());
-        services.AddSingleton<BackendBankService>();
+        services.AddDbContext<BankDbContext>(options =>
+        {
+            options.UseSqlite(_sqliteConnection);
+        });
+        services.AddScoped<IBankReadRepository, BankPostgresRepository>();
+        services.AddScoped<IBankWriteRepository, BankPostgresRepository>();
+        services.AddScoped<BackendBankService>();
         services.AddMassTransit(busRegistrationConfigurator =>
         {
             busRegistrationConfigurator.AddConsumer<ScheduleBankTransferConsumer>();
@@ -147,6 +151,12 @@ public class BankServiceMessageFlowTests
             });
         });
 
-        return services.BuildServiceProvider(validateScopes: true);
+        var provider = services.BuildServiceProvider(validateScopes: true);
+
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<BankDbContext>();
+        db.Database.EnsureCreated();
+
+        return provider;
     }
 }

@@ -1,32 +1,31 @@
 using MassTransit;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TaxSystem.CitizenService.Consumers;
+using TaxSystem.CitizenService.Persistance;
 using TaxSystem.CitizenService.Repositories;
 using TaxSystem.Shared.Messaging.Contracts;
 using TaxSystem.Shared.Models;
-using TaxSystem.Shared.Persistance;
 using BackendCitizenService = TaxSystem.CitizenService.Services.CitizenService;
 
 namespace TaxSystem.Tests.ServiceTests.CitizenService;
 
 public class CitizenServiceMessageFlowTests
 {
-    private string _dataPath = string.Empty;
+    private SqliteConnection _sqliteConnection = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _dataPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "citizen-service-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_dataPath);
+        _sqliteConnection = new SqliteConnection("DataSource=:memory:");
+        _sqliteConnection.Open();
     }
 
     [TearDown]
     public void TearDown()
     {
-        if (Directory.Exists(_dataPath))
-        {
-            Directory.Delete(_dataPath, recursive: true);
-        }
+        _sqliteConnection.Dispose();
     }
 
     [Test]
@@ -48,7 +47,7 @@ public class CitizenServiceMessageFlowTests
                 "Copenhagen",
                 "1000",
                 "1234567890"));
-            var citizen = await provider.GetRequiredService<IReadCitizenRepository>().GetByCprAsync("101011234");
+            var citizen = await scope.ServiceProvider.GetRequiredService<IReadCitizenRepository>().GetByCprAsync("101011234");
 
             Assert.That(response.Message, Is.EqualTo(new CitizenRegistered("101011234", "John Doe")));
             Assert.That(citizen, Is.Not.Null);
@@ -67,16 +66,19 @@ public class CitizenServiceMessageFlowTests
     {
         await using var provider = BuildProvider(_ => { });
         var bus = provider.GetRequiredService<IBusControl>();
-        await provider.GetRequiredService<IWriteCitizenRepository>().SaveAsync(new Citizen
+        using (var setupScope = provider.CreateScope())
         {
-            cpr = "101011234",
-            firstName = "John",
-            lastName = "Doe",
-            streetAddress = "Main Street 1",
-            city = "Copenhagen",
-            zipCode = "1000",
-            bankAccountNumber = "1234567890"
-        });
+            await setupScope.ServiceProvider.GetRequiredService<IWriteCitizenRepository>().SaveAsync(new Citizen
+            {
+                cpr = "101011234",
+                firstName = "John",
+                lastName = "Doe",
+                streetAddress = "Main Street 1",
+                city = "Copenhagen",
+                zipCode = "1000",
+                bankAccountNumber = "1234567890"
+            });
+        }
 
         await bus.StartAsync();
         try
@@ -137,12 +139,15 @@ public class CitizenServiceMessageFlowTests
             });
         });
         var bus = provider.GetRequiredService<IBusControl>();
-        await provider.GetRequiredService<IWriteCitizenRepository>().SaveAsync(new Citizen
+        using (var setupScope = provider.CreateScope())
         {
-            cpr = "101011234",
-            firstName = "John",
-            lastName = "Doe"
-        });
+            await setupScope.ServiceProvider.GetRequiredService<IWriteCitizenRepository>().SaveAsync(new Citizen
+            {
+                cpr = "101011234",
+                firstName = "John",
+                lastName = "Doe"
+            });
+        }
 
         await bus.StartAsync();
         try
@@ -151,7 +156,9 @@ public class CitizenServiceMessageFlowTests
             var client = scope.ServiceProvider.GetRequiredService<IRequestClient<CitizenDeregistrationRequested>>();
             var response = await client.GetResponse<CitizenDeregistered>(new CitizenDeregistrationRequested("101011234"));
             var message = await deregistered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            var citizen = await provider.GetRequiredService<IReadCitizenRepository>().GetByCprAsync("101011234");
+
+            using var readScope = provider.CreateScope();
+            var citizen = await readScope.ServiceProvider.GetRequiredService<IReadCitizenRepository>().GetByCprAsync("101011234");
 
             Assert.That(response.Message, Is.EqualTo(new CitizenDeregistered("101011234")));
             Assert.That(message, Is.EqualTo(new CitizenDeregistered("101011234")));
@@ -166,13 +173,13 @@ public class CitizenServiceMessageFlowTests
     private ServiceProvider BuildProvider(Action<IInMemoryBusFactoryConfigurator> configure)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(_ => new FileSystemRepository("citizens", _dataPath));
-        services.AddSingleton<CitizenRepository>();
-        services.AddSingleton<IReadCitizenRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<CitizenRepository>());
-        services.AddSingleton<IWriteCitizenRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<CitizenRepository>());
-        services.AddSingleton<BackendCitizenService>();
+        services.AddDbContext<CitizenDbContext>(options =>
+        {
+            options.UseSqlite(_sqliteConnection);
+        });
+        services.AddScoped<IReadCitizenRepository, CitizenPostgresRepository>();
+        services.AddScoped<IWriteCitizenRepository, CitizenPostgresRepository>();
+        services.AddScoped<BackendCitizenService>();
         services.AddMassTransit(busRegistrationConfigurator =>
         {
             busRegistrationConfigurator.AddConsumer<CitizenRegistrationRequestedConsumer>();
@@ -194,6 +201,12 @@ public class CitizenServiceMessageFlowTests
             });
         });
 
-        return services.BuildServiceProvider(validateScopes: true);
+        var provider = services.BuildServiceProvider(validateScopes: true);
+
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CitizenDbContext>();
+        db.Database.EnsureCreated();
+
+        return provider;
     }
 }

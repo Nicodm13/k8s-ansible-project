@@ -1,6 +1,8 @@
 ﻿using System.Threading.Tasks;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
+using TaxSystem.CompanyService.Persistance;
 using TaxSystem.CompanyService.Repositories;
 using TaxSystem.Shared.Messaging;
 using TaxSystem.Shared.Persistance;
@@ -15,15 +17,18 @@ internal class Program
         var builder = Host.CreateApplicationBuilder(args);
 
         builder.Services.AddTaxSystemRabbitMq(builder.Configuration);
-        builder.Services.AddSingleton(_ => new FileSystemRepository("companies"));
-        builder.Services.AddSingleton<CompanyRepository>();
-        builder.Services.AddSingleton<IReadCompanyRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<CompanyRepository>());
-        builder.Services.AddSingleton<IWriteCompanyRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<CompanyRepository>());
-        builder.Services.AddSingleton<BackendCompanyService>();
+        builder.Services.AddTaxSystemPostgres<CompanyDbContext>();
+        builder.Services.AddScoped<IReadCompanyRepository, CompanyPostgresRepository>();
+        builder.Services.AddScoped<IWriteCompanyRepository, CompanyPostgresRepository>();
+        builder.Services.AddScoped<BackendCompanyService>();
 
         var host = builder.Build();
+
+        using (var scope = host.Services.CreateScope())
+        {
+            var db = scope.ServiceProvider.GetRequiredService<CompanyDbContext>();
+            await db.Database.EnsureCreatedAsync();
+        }
 
         await host.RunAsync();
     }

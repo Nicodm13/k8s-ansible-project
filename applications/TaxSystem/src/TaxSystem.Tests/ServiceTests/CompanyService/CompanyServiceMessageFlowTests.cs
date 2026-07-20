@@ -1,32 +1,31 @@
 using MassTransit;
+using Microsoft.Data.Sqlite;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TaxSystem.CompanyService.Consumers;
+using TaxSystem.CompanyService.Persistance;
 using TaxSystem.CompanyService.Repositories;
 using TaxSystem.Shared.Messaging.Contracts;
 using TaxSystem.Shared.Models;
-using TaxSystem.Shared.Persistance;
 using BackendCompanyService = TaxSystem.CompanyService.Services.CompanyService;
 
 namespace TaxSystem.Tests.ServiceTests.CompanyService;
 
 public class CompanyServiceMessageFlowTests
 {
-    private string _dataPath = string.Empty;
+    private SqliteConnection _sqliteConnection = null!;
 
     [SetUp]
     public void SetUp()
     {
-        _dataPath = Path.Combine(TestContext.CurrentContext.WorkDirectory, "company-service-tests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_dataPath);
+        _sqliteConnection = new SqliteConnection("DataSource=:memory:");
+        _sqliteConnection.Open();
     }
 
     [TearDown]
     public void TearDown()
     {
-        if (Directory.Exists(_dataPath))
-        {
-            Directory.Delete(_dataPath, recursive: true);
-        }
+        _sqliteConnection.Dispose();
     }
 
     [Test]
@@ -51,7 +50,9 @@ public class CompanyServiceMessageFlowTests
             await bus.Publish(new CompanyRegistrationRequested("12345678", "Acme Corp"));
 
             var message = await registered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            var company = await provider.GetRequiredService<IReadCompanyRepository>().GetByCvrAsync("12345678");
+
+            using var scope = provider.CreateScope();
+            var company = await scope.ServiceProvider.GetRequiredService<IReadCompanyRepository>().GetByCvrAsync("12345678");
 
             Assert.That(message, Is.EqualTo(new CompanyRegistered("12345678", "Acme Corp")));
             Assert.That(company, Is.Not.Null);
@@ -76,7 +77,9 @@ public class CompanyServiceMessageFlowTests
             using var scope = provider.CreateScope();
             var client = scope.ServiceProvider.GetRequiredService<IRequestClient<CompanyRegistrationRequested>>();
             var response = await client.GetResponse<CompanyRegistered>(new CompanyRegistrationRequested("12345678", "Acme Corp"));
-            var company = await provider.GetRequiredService<IReadCompanyRepository>().GetByCvrAsync("12345678");
+
+            using var readScope = provider.CreateScope();
+            var company = await readScope.ServiceProvider.GetRequiredService<IReadCompanyRepository>().GetByCvrAsync("12345678");
 
             Assert.That(response.Message, Is.EqualTo(new CompanyRegistered("12345678", "Acme Corp")));
             Assert.That(company, Is.Not.Null);
@@ -115,11 +118,14 @@ public class CompanyServiceMessageFlowTests
             });
         });
         var bus = provider.GetRequiredService<IBusControl>();
-        await provider.GetRequiredService<IWriteCompanyRepository>().SaveAsync(new Company
+        using (var setupScope = provider.CreateScope())
         {
-            CVR = "12345678",
-            Name = "Acme Corp"
-        });
+            await setupScope.ServiceProvider.GetRequiredService<IWriteCompanyRepository>().SaveAsync(new Company
+            {
+                CVR = "12345678",
+                Name = "Acme Corp"
+            });
+        }
 
         await bus.StartAsync();
         try
@@ -144,11 +150,14 @@ public class CompanyServiceMessageFlowTests
     {
         await using var provider = BuildProvider(_ => { });
         var bus = provider.GetRequiredService<IBusControl>();
-        await provider.GetRequiredService<IWriteCompanyRepository>().SaveAsync(new Company
+        using (var setupScope = provider.CreateScope())
         {
-            CVR = "12345678",
-            Name = "Acme Corp"
-        });
+            await setupScope.ServiceProvider.GetRequiredService<IWriteCompanyRepository>().SaveAsync(new Company
+            {
+                CVR = "12345678",
+                Name = "Acme Corp"
+            });
+        }
 
         await bus.StartAsync();
         try
@@ -202,11 +211,14 @@ public class CompanyServiceMessageFlowTests
             });
         });
         var bus = provider.GetRequiredService<IBusControl>();
-        await provider.GetRequiredService<IWriteCompanyRepository>().SaveAsync(new Company
+        using (var setupScope = provider.CreateScope())
         {
-            CVR = "12345678",
-            Name = "Acme Corp"
-        });
+            await setupScope.ServiceProvider.GetRequiredService<IWriteCompanyRepository>().SaveAsync(new Company
+            {
+                CVR = "12345678",
+                Name = "Acme Corp"
+            });
+        }
 
         await bus.StartAsync();
         try
@@ -215,7 +227,9 @@ public class CompanyServiceMessageFlowTests
             var client = scope.ServiceProvider.GetRequiredService<IRequestClient<CompanyDeregistrationRequested>>();
             var response = await client.GetResponse<CompanyDeregistered>(new CompanyDeregistrationRequested("12345678"));
             var message = await deregistered.Task.WaitAsync(TimeSpan.FromSeconds(5));
-            var company = await provider.GetRequiredService<IReadCompanyRepository>().GetByCvrAsync("12345678");
+
+            using var readScope = provider.CreateScope();
+            var company = await readScope.ServiceProvider.GetRequiredService<IReadCompanyRepository>().GetByCvrAsync("12345678");
 
             Assert.That(response.Message, Is.EqualTo(new CompanyDeregistered("12345678")));
             Assert.That(message, Is.EqualTo(new CompanyDeregistered("12345678")));
@@ -230,13 +244,13 @@ public class CompanyServiceMessageFlowTests
     private ServiceProvider BuildProvider(Action<IInMemoryBusFactoryConfigurator> configure)
     {
         var services = new ServiceCollection();
-        services.AddSingleton(_ => new FileSystemRepository("companies", _dataPath));
-        services.AddSingleton<CompanyRepository>();
-        services.AddSingleton<IReadCompanyRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<CompanyRepository>());
-        services.AddSingleton<IWriteCompanyRepository>(serviceProvider =>
-            serviceProvider.GetRequiredService<CompanyRepository>());
-        services.AddSingleton<BackendCompanyService>();
+        services.AddDbContext<CompanyDbContext>(options =>
+        {
+            options.UseSqlite(_sqliteConnection);
+        });
+        services.AddScoped<IReadCompanyRepository, CompanyPostgresRepository>();
+        services.AddScoped<IWriteCompanyRepository, CompanyPostgresRepository>();
+        services.AddScoped<BackendCompanyService>();
         services.AddMassTransit(busRegistrationConfigurator =>
         {
             busRegistrationConfigurator.AddConsumer<CompanyRegistrationRequestedConsumer>();
@@ -262,6 +276,12 @@ public class CompanyServiceMessageFlowTests
             });
         });
 
-        return services.BuildServiceProvider(validateScopes: true);
+        var provider = services.BuildServiceProvider(validateScopes: true);
+
+        using var scope = provider.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<CompanyDbContext>();
+        db.Database.EnsureCreated();
+
+        return provider;
     }
 }
