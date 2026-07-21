@@ -80,14 +80,8 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"citizen lookup responded\", () => {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
-              "});",
-              "",
-              "pm.test(\"citizen should exist after seeding\", () => {",
-              "  if (pm.response.code === 404) {",
-              "    console.warn(`Citizen ${pm.iterationData.get(\"cpr\")} was not found.`);",
-              "  }",
+              "pm.test(\"citizen lookup responded with OK\", () => {",
+              "  pm.response.to.have.status(200);",
               "});",
               "pm.test(\"response time is acceptable\", () => {",
               "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",
@@ -122,7 +116,7 @@
             "type": "text/javascript",
             "exec": [
               "pm.test(\"deductible report handled\", () => {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 501]);",
+              "  pm.response.to.have.status(200);",
               "});",
               "pm.test(\"response time is acceptable\", () => {",
               "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",
@@ -172,14 +166,8 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"company lookup responded\", () => {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
-              "});",
-              "",
-              "pm.test(\"company should exist after seeding\", () => {",
-              "  if (pm.response.code === 404) {",
-              "    console.warn(`Company ${pm.iterationData.get(\"cvr\")} was not found.`);",
-              "  }",
+              "pm.test(\"company lookup responded with OK\", () => {",
+              "  pm.response.to.have.status(200);",
               "});",
               "pm.test(\"response time is acceptable\", () => {",
               "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",
@@ -214,7 +202,7 @@
             "type": "text/javascript",
             "exec": [
               "pm.test(\"salary report accepted\", () => {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 202]);",
+              "  pm.response.to.have.status(200);",
               "});",
               "pm.test(\"response time is acceptable\", () => {",
               "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",
@@ -266,8 +254,8 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"statement endpoint responded\", () => {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+              "pm.test(\"statement endpoint responded with OK\", () => {",
+              "  pm.response.to.have.status(200);",
               "});",
               "pm.test(\"response time is acceptable\", () => {",
               "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",
@@ -303,8 +291,8 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "pm.test(\"bank transfers endpoint responded\", () => {",
-              "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+              "pm.test(\"bank transfers endpoint responded with OK\", () => {",
+              "  pm.response.to.have.status(200);",
               "});",
               "pm.test(\"response time is acceptable\", () => {",
               "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",

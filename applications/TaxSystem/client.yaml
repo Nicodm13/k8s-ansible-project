@@ -6,7 +6,7 @@ metadata:
   labels:
     app: client
 spec:
-  replicas: 1
+  replicas: 2
   selector:
     matchLabels:
       app: client
@@ -15,6 +15,13 @@ spec:
       labels:
         app: client
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: client
       containers:
         - name: client
           image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-client:6c8c5c027d0dc8276a56e22a3a22edfa013dbdad
