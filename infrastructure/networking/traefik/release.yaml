@@ -30,7 +30,17 @@ spec:
   values:
 
     deployment:
-      replicas: 1
+      replicas: 2
+      podLabels:
+        spread: traefik
+
+    topologySpreadConstraints:
+      - maxSkew: 1
+        topologyKey: kubernetes.io/hostname
+        whenUnsatisfiable: ScheduleAnyway
+        labelSelector:
+          matchLabels:
+            spread: traefik
 
     hostNetwork: false
 
