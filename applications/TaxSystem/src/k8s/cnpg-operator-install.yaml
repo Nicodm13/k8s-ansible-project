@@ -1,22 +1,18 @@
 # CloudNativePG Operator Installation
 #
-# This file fetches and installs the CloudNativePG operator from the official release.
-# Apply this BEFORE any Cluster resources:
+# The operator must be installed BEFORE applying postgres-cluster.yaml.
 #
+# For CI / manual install:
 #   kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.25/releases/cnpg-1.25.1.yaml
 #
-# Or apply this file which re-exports the same manifest:
-#   kubectl apply --server-side -f k8s/cnpg-operator-install.yaml
+# For production (Flux GitOps), add a HelmRelease in your infrastructure repo:
+#   chart: cloudnative-pg from https://cloudnative-pg.github.io/charts
+#   namespace: cnpg-system
 #
-# The operator installs into the cnpg-system namespace and manages Cluster CRDs cluster-wide.
 # Memory footprint: ~50MB for the operator controller pod.
 #
 # Verify installation:
 #   kubectl get deployment -n cnpg-system cnpg-controller-manager
-#
-# Note: This file is intentionally a pointer/instructions file.
-# The actual operator manifest is large (~5000 lines) and should be fetched from upstream.
-# In CI, use the kubectl apply command above as a pre-deployment step.
 ---
 apiVersion: v1
 kind: Namespace
@@ -24,4 +20,3 @@ metadata:
   name: cnpg-system
   labels:
     app.kubernetes.io/name: cloudnative-pg
-

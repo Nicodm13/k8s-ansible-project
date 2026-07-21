@@ -15,7 +15,7 @@ apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
   name: taxsystem-db
-  namespace: tax-system
+  namespace: taxsystem
 spec:
   instances: 2
 

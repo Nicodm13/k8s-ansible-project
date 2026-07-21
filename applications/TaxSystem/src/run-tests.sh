@@ -167,13 +167,13 @@ echo ""
 echo "[5/7] Deploying K8s manifests..."
 
 # Clean up existing deployments
-kubectl delete deployments --all -n tax-system --ignore-not-found --wait=true
-kubectl delete statefulsets --all -n tax-system --ignore-not-found --wait=true
-kubectl delete cluster taxsystem-db -n tax-system --ignore-not-found --wait=true 2>/dev/null || true
+kubectl delete deployments --all -n taxsystem --ignore-not-found --wait=true
+kubectl delete statefulsets --all -n taxsystem --ignore-not-found --wait=true
+kubectl delete cluster taxsystem-db -n taxsystem --ignore-not-found --wait=true 2>/dev/null || true
 
 # Wait for all CNPG pods to fully terminate before redeploying
 echo "  Waiting for old database pods to terminate..."
-kubectl wait --for=delete pod -l cnpg.io/cluster=taxsystem-db -n tax-system --timeout=60s 2>/dev/null || true
+kubectl wait --for=delete pod -l cnpg.io/cluster=taxsystem-db -n taxsystem --timeout=60s 2>/dev/null || true
 
 # Install CloudNativePG operator (idempotent)
 echo "  Installing CloudNativePG operator..."
@@ -184,9 +184,9 @@ echo "  ✓ CloudNativePG operator ready."
 
 # Ensure namespace exists
 kubectl apply -f "$SCRIPT_DIR/k8s/cnpg-operator-install.yaml"
-kubectl create namespace tax-system --dry-run=client -o yaml | kubectl apply -f -
-echo "  Waiting for namespace tax-system..."
-kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/tax-system --timeout=15s
+kubectl create namespace taxsystem --dry-run=client -o yaml | kubectl apply -f -
+echo "  Waiting for namespace taxsystem..."
+kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/taxsystem --timeout=15s
 
 # Apply credentials first (needed by cluster and services)
 kubectl apply -f "$SCRIPT_DIR/k8s/postgres-credentials.yaml"
@@ -198,11 +198,11 @@ docker pull ghcr.io/cloudnative-pg/postgresql:16.4 || true
 echo "  Deploying PostgreSQL cluster..."
 kubectl apply -f "$SCRIPT_DIR/k8s/postgres-cluster.yaml"
 echo "  Waiting for PostgreSQL cluster to be ready (up to 120s)..."
-kubectl wait --for=condition=Ready cluster/taxsystem-db -n tax-system --timeout=120s
+kubectl wait --for=condition=Ready cluster/taxsystem-db -n taxsystem --timeout=120s
 if [ $? -ne 0 ]; then
   echo "✗ PostgreSQL cluster not ready"
-  kubectl get cluster -n tax-system
-  kubectl get pods -n tax-system -l cnpg.io/cluster=taxsystem-db
+  kubectl get cluster -n taxsystem
+  kubectl get pods -n taxsystem -l cnpg.io/cluster=taxsystem-db
   exit 1
 fi
 echo "  ✓ PostgreSQL cluster ready."
@@ -223,34 +223,34 @@ APP_LABELS="app=client,app=citizen-service,app=company-service,app=bank-service,
 DB_LABEL="cnpg.io/cluster=taxsystem-db,cnpg.io/instanceRole"
 
 echo "  Waiting for application pods..."
-if ! kubectl wait --for=condition=ready pod -l app -n tax-system --timeout=90s 2>/dev/null; then
+if ! kubectl wait --for=condition=ready pod -l app -n taxsystem --timeout=90s 2>/dev/null; then
   # Fallback: try individual waits
   for app in client citizen-service company-service bank-service statementgenerator-service rabbitmq; do
-    if ! kubectl wait --for=condition=ready pod -l "app=$app" -n tax-system --timeout=60s; then
+    if ! kubectl wait --for=condition=ready pod -l "app=$app" -n taxsystem --timeout=60s; then
       echo "✗ Pod for $app is not ready"
-      kubectl get pods -n tax-system -o wide
-      kubectl logs -l "app=$app" -n tax-system --tail=30 2>&1 || true
+      kubectl get pods -n taxsystem -o wide
+      kubectl logs -l "app=$app" -n taxsystem --tail=30 2>&1 || true
       exit 1
     fi
   done
 fi
 
 echo "  Waiting for database pods..."
-kubectl wait --for=condition=ready pod -l "cnpg.io/cluster=taxsystem-db" -n tax-system --timeout=30s 2>/dev/null || true
+kubectl wait --for=condition=ready pod -l "cnpg.io/cluster=taxsystem-db" -n taxsystem --timeout=30s 2>/dev/null || true
 
 echo "✓ All pods ready."
 
 echo "  Waiting for MassTransit buses to be connected..."
 for app in client citizen-service company-service bank-service statementgenerator-service; do
-  if ! kubectl wait --for=condition=ready pod -l app="$app" -n tax-system --timeout=15s >/dev/null; then
+  if ! kubectl wait --for=condition=ready pod -l app="$app" -n taxsystem --timeout=15s >/dev/null; then
     echo "✗ Pod for $app is not ready"
     exit 1
   fi
 
-  pod=$(kubectl get pod -l app="$app" -n tax-system -o jsonpath='{.items[0].metadata.name}')
+  pod=$(kubectl get pod -l app="$app" -n taxsystem -o jsonpath='{.items[0].metadata.name}')
   bus_ready=false
   for attempt in {1..30}; do
-    if kubectl logs "$pod" -n tax-system --tail=80 2>/dev/null | grep -q "Bus started:"; then
+    if kubectl logs "$pod" -n taxsystem --tail=80 2>/dev/null | grep -q "Bus started:"; then
       bus_ready=true
       break
     fi
@@ -260,7 +260,7 @@ for app in client citizen-service company-service bank-service statementgenerato
 
   if [ "$bus_ready" = false ]; then
     echo "✗ MassTransit bus did not start for $app"
-    kubectl logs "$pod" -n tax-system --tail=80 2>&1 || true
+    kubectl logs "$pod" -n taxsystem --tail=80 2>&1 || true
     exit 1
   fi
 done
@@ -273,9 +273,9 @@ echo ""
 echo "[7/7] Running E2E tests..."
 
 # Port-forward Client and RabbitMQ in background
-kubectl port-forward service/client 38080:8080 -n tax-system &
+kubectl port-forward service/client 38080:8080 -n taxsystem &
 PF_CLIENT_PID=$!
-kubectl port-forward service/rabbitmq 35672:5672 -n tax-system &
+kubectl port-forward service/rabbitmq 35672:5672 -n taxsystem &
 PF_RABBITMQ_PID=$!
 sleep 2
 
@@ -300,8 +300,8 @@ dotnet test "$SCRIPT_DIR/TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj" \
 if [ $? -ne 0 ]; then
   echo ""
   echo "✗ E2E TESTS FAILED"
-  kubectl get pods --namespace tax-system
-  kubectl logs --namespace tax-system -l app=client --tail=30 2>/dev/null || true
+  kubectl get pods --namespace taxsystem
+  kubectl logs --namespace taxsystem -l app=client --tail=30 2>/dev/null || true
   exit 1
 fi
 
