@@ -197,13 +197,19 @@ helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>&1 || true
 helm repo update bitnami >/dev/null
 if ! helm upgrade --install rabbitmq bitnami/rabbitmq \
   --namespace taxsystem \
+  --version 16.0.14 \
+  --set global.security.allowInsecureImages=true \
+  --set image.registry=docker.io \
+  --set image.repository=bitnamilegacy/rabbitmq \
+  --set image.tag=4.1.3-debian-12-r1 \
   --set auth.username=taxsystem \
   --set auth.password=taxsystem-dev \
   --set auth.erlangCookie=taxsystem-dev-cookie \
   --set persistence.enabled=false \
+  --set resourcesPreset=small \
   --set service.type=ClusterIP \
   --wait \
-  --timeout 300s; then
+  --timeout 120s; then
   echo "✗ RabbitMQ Helm install failed"
   kubectl get pods,statefulset,svc,endpoints -n taxsystem
   kubectl describe statefulset rabbitmq -n taxsystem 2>&1 || true
@@ -211,8 +217,8 @@ if ! helm upgrade --install rabbitmq bitnami/rabbitmq \
   exit 1
 fi
 
-kubectl rollout status statefulset/rabbitmq -n taxsystem --timeout=300s
-kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=rabbitmq -n taxsystem --timeout=300s
+kubectl rollout status statefulset/rabbitmq -n taxsystem --timeout=120s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=rabbitmq -n taxsystem --timeout=120s
 echo "  ✓ RabbitMQ ready."
 
 # Apply credentials first (needed by cluster and services)
