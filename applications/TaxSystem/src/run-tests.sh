@@ -14,8 +14,20 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
-TAXSYSTEM_MANIFEST_DIR="$REPO_ROOT/applications/TaxSystem"
+# The K8s/GitOps manifests (postgres-credentials.yaml, postgres-cluster.yaml, kustomization,
+# etc.) always live exactly one directory above `src` (see AGENTS.md: "K8s deployments |
+# ../ from src"). Resolve it relative to SCRIPT_DIR directly rather than assuming a fixed
+# repo-root depth - the latter breaks if only the `src` folder is copied into WSL (as the
+# instructions below suggest), since going up further than the copied tree lands at "/".
+TAXSYSTEM_MANIFEST_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [ ! -f "$TAXSYSTEM_MANIFEST_DIR/postgres-credentials.yaml" ] || [ ! -f "$TAXSYSTEM_MANIFEST_DIR/postgres-cluster.yaml" ]; then
+  echo "ERROR: Expected TaxSystem K8s manifests under $TAXSYSTEM_MANIFEST_DIR"
+  echo "(postgres-credentials.yaml / postgres-cluster.yaml not found)."
+  echo "Make sure the 'applications/TaxSystem' directory (which contains 'src') was"
+  echo "copied in full, not just the 'src' subfolder."
+  exit 1
+fi
 
 case "$SCRIPT_DIR" in
   /mnt/*|/media/*)
