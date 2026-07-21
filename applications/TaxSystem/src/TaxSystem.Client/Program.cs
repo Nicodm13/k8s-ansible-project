@@ -26,6 +26,7 @@ public class Program
             registrationConfigurator.AddRequestClient<GenerateTaxStatement>();
             registrationConfigurator.AddRequestClient<BankTransferInfoRequested>();
             registrationConfigurator.AddRequestClient<ReportSalary>();
+            registrationConfigurator.AddRequestClient<ReportDeductibles>();
         });
         builder.Services.AddControllers();
         builder.Services.AddHealthChecks();

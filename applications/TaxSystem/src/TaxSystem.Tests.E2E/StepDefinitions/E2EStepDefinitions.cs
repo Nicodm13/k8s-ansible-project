@@ -77,6 +77,15 @@ public sealed class E2EStepDefinitions : IDisposable
         _paidTax = paidTax;
     }
 
+    [Given(@"the employee reports deductibles of (\d+)")]
+    public async Task GivenTheEmployeeReportsDeductiblesOf(int amount)
+    {
+        var year = DateTime.Now.Year;
+        _lastResponse = await _httpClient.PostAsJsonAsync(
+            $"/Citizen/{_employeeCpr}/deductibles/{year}",
+            new[] { new { amount, deductionType = "Other" } });
+    }
+
     [When(@"the statement is generated")]
     public async Task WhenTheStatementIsGenerated()
     {
@@ -128,6 +137,38 @@ public sealed class E2EStepDefinitions : IDisposable
             $"Expected success but got {response.StatusCode}: {content}");
         Assert.That(content, Does.Contain(name));
         Assert.That(content, Does.Contain(grossIncome.ToString()));
+    }
+
+    [Then(@"the statement should contain a deductible of (\d+)")]
+    public async Task ThenTheStatementShouldContainADeductibleOf(int deductible)
+    {
+        var year = DateTime.Now.Year;
+        var (response, content) = await GetStatementWithRetryAsync(_employeeCpr!, year);
+
+        Assert.That(response.IsSuccessStatusCode, Is.True,
+            $"Expected success but got {response.StatusCode}: {content}");
+        Assert.That(content, Does.Contain(deductible.ToString()));
+    }
+
+    [Then(@"no statement should be available for the employee")]
+    public async Task ThenNoStatementShouldBeAvailableForTheEmployee()
+    {
+        var year = DateTime.Now.Year;
+        HttpResponseMessage? response = null;
+        string content = string.Empty;
+
+        // Give the (fire-and-forget) deductibles report a moment to be processed, then confirm
+        // the statement still never becomes available since no salary was ever reported.
+        for (var attempt = 0; attempt < 5; attempt++)
+        {
+            response = await _httpClient.GetAsync($"/StatementGenerator/{_employeeCpr}/Statements/{year}");
+            content = await response.Content.ReadAsStringAsync();
+            await Task.Delay(TimeSpan.FromSeconds(1));
+        }
+
+        Assert.That(response, Is.Not.Null);
+        Assert.That(response!.StatusCode, Is.EqualTo(System.Net.HttpStatusCode.NotFound),
+            $"Expected no statement to be available but got {response.StatusCode}: {content}");
     }
 
     [Then(@"a bank transfer of (\d+) should be scheduled")]

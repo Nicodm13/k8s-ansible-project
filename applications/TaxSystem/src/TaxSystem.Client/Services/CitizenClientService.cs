@@ -9,17 +9,20 @@ public class CitizenClientService
     private readonly IRequestClient<CitizenRegistrationRequested> _citizenRegistrationClient;
     private readonly IRequestClient<CitizenInfoRequested> _citizenInfoClient;
     private readonly IRequestClient<CitizenDeregistrationRequested> _citizenDeregistrationClient;
+    private readonly IRequestClient<ReportDeductibles> _reportDeductiblesClient;
     private readonly IPublishEndpoint _publishEndpoint;
 
     public CitizenClientService(
         IRequestClient<CitizenRegistrationRequested> citizenRegistrationClient,
         IRequestClient<CitizenInfoRequested> citizenInfoClient,
         IRequestClient<CitizenDeregistrationRequested> citizenDeregistrationClient,
+        IRequestClient<ReportDeductibles> reportDeductiblesClient,
         IPublishEndpoint publishEndpoint)
     {
         _citizenRegistrationClient = citizenRegistrationClient;
         _citizenInfoClient = citizenInfoClient;
         _citizenDeregistrationClient = citizenDeregistrationClient;
+        _reportDeductiblesClient = reportDeductiblesClient;
         _publishEndpoint = publishEndpoint;
     }
 
@@ -54,9 +57,26 @@ public class CitizenClientService
         await _publishEndpoint.Publish(new TaxInfoReported(citizenId.ToString(), name, income, 0m, 0m, 0m));
     }
 
-    public void ReportDeductibles(int citizenId, int year, IEnumerable<Deductible> deductibles)
+    /// <summary>
+    /// Reports each deductible for the citizen and awaits confirmation from
+    /// TaxSystem.StatementGeneratorService for every one, exactly like a company reporting an
+    /// employee's salary awaits <see cref="SalaryReported"/> via CompanyClientService.
+    /// </summary>
+    /// <returns>true if every deductible was acknowledged; otherwise false.</returns>
+    public async Task<bool> ReportDeductibles(string cpr, int year, IEnumerable<Deductible> deductibles)
     {
-        throw new NotImplementedException();
+        foreach (var deductible in deductibles)
+        {
+            var response = await _reportDeductiblesClient.GetResponse<DeductiblesReported>(
+                new ReportDeductibles(cpr, deductible.Amount, deductible.DeductionType));
+
+            if (response.Message is null)
+            {
+                return false;
+            }
+        }
+
+        return true;
     }
     
     /// <summary>

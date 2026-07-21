@@ -233,9 +233,53 @@ public class StatementGeneratorServiceMessageFlowTests
         }
     }
 
+    [Test]
+    public async Task ReportDeductiblesPersistsPercentageAdjustedAmountAndRespondsWithDeductiblesReported()
+    {
+        var generateTaxStatement = new TaskCompletionSource<GenerateTaxStatement>();
+        await using var provider = BuildProvider(configurator =>
+        {
+            configurator.ReceiveEndpoint("generate-tax-statement-deductibles-test", endpoint =>
+            {
+                endpoint.Handler<GenerateTaxStatement>(context =>
+                {
+                    generateTaxStatement.SetResult(context.Message);
+                    return Task.CompletedTask;
+                });
+            });
+        }, includeGenerateTaxStatementConsumer: false, includeReportDeductiblesConsumer: true);
+        var bus = provider.GetRequiredService<IBusControl>();
+
+        await bus.StartAsync();
+        try
+        {
+            using var scope = provider.CreateScope();
+            var client = scope.ServiceProvider.GetRequiredService<IRequestClient<ReportDeductibles>>();
+            var response = await client.GetResponse<DeductiblesReported>(
+                new ReportDeductibles("101011234", 10000m, "CharitableDonations"));
+
+            var message = await generateTaxStatement.Task.WaitAsync(TimeSpan.FromSeconds(5));
+
+            using var readScope = provider.CreateScope();
+            var statement = await readScope.ServiceProvider.GetRequiredService<IReadStatementRepository>()
+                .GetMergedStatementAsync("101011234");
+
+            // CharitableDonations deducts 50% of the reported amount.
+            Assert.That(response.Message, Is.EqualTo(new DeductiblesReported("101011234", 5000m, "CharitableDonations")));
+            Assert.That(message, Is.EqualTo(new GenerateTaxStatement("101011234")));
+            Assert.That(statement, Is.Not.Null);
+            Assert.That(statement!.annualTotalDeduction, Is.EqualTo("5000"));
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
+    }
+
     private ServiceProvider BuildProvider(
         Action<IInMemoryBusFactoryConfigurator> configure,
-        bool includeGenerateTaxStatementConsumer = true)
+        bool includeGenerateTaxStatementConsumer = true,
+        bool includeReportDeductiblesConsumer = false)
     {
         var services = new ServiceCollection();
         services.AddDbContext<StatementDbContext>(options =>
@@ -253,6 +297,12 @@ public class StatementGeneratorServiceMessageFlowTests
                 busRegistrationConfigurator.AddConsumer<GenerateTaxStatementConsumer>();
             }
 
+            if (includeReportDeductiblesConsumer)
+            {
+                busRegistrationConfigurator.AddConsumer<ReportDeductiblesConsumer>();
+                busRegistrationConfigurator.AddRequestClient<ReportDeductibles>();
+            }
+
             busRegistrationConfigurator.UsingInMemory((context, configurator) =>
             {
                 configurator.ReceiveEndpoint("statement-generator-service", endpoint =>
@@ -261,6 +311,11 @@ public class StatementGeneratorServiceMessageFlowTests
                     if (includeGenerateTaxStatementConsumer)
                     {
                         endpoint.ConfigureConsumer<GenerateTaxStatementConsumer>(context);
+                    }
+
+                    if (includeReportDeductiblesConsumer)
+                    {
+                        endpoint.ConfigureConsumer<ReportDeductiblesConsumer>(context);
                     }
 
                     endpoint.Handler<CitizenInfoRequested>(async requestContext =>

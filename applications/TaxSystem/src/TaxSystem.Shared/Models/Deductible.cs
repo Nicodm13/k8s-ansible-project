@@ -1,20 +1,15 @@
 namespace TaxSystem.Shared.Models;
 
+/// <summary>
+/// A deductible expense reported by a citizen (e.g. charitable donations, commuting costs).
+/// Only a percentage of the reported amount is actually deductible; the percentage for each
+/// <see cref="DeductionType"/> is applied by TaxSystem.StatementGeneratorService when the
+/// deduction is recorded against the citizen's tax statement.
+/// </summary>
 public class Deductible
 {
-    int _amount;
-    public double deductionPercentage;
+    public decimal Amount { get; set; }
 
-    internal class CharitableDonations : Deductible
-    {
-        public readonly double deductionPercentage = 0.5;
-        public CharitableDonations(int amount) { _amount = amount; }
-    }
-
-    internal class Commuting : Deductible
-    {
-        public readonly double deductionPercentage = 0.3;
-        public Commuting(int amount) { _amount = amount; }
-    }
-
+    public string DeductionType { get; set; } = string.Empty;
 }
+
