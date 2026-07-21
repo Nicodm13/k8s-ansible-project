@@ -10,17 +10,20 @@ public class CompanyClientService
     private readonly IRequestClient<CompanyInfoRequested> _companyInfoClient;
     private readonly IRequestClient<CompanyRegistrationRequested> _companyRegistrationClient;
     private readonly IRequestClient<CompanyDeregistrationRequested> _companyDeregistrationClient;
+    private readonly IRequestClient<ReportSalary> _reportSalaryClient;
 
     public CompanyClientService(
         IPublishEndpoint publishEndpoint,
         IRequestClient<CompanyInfoRequested> companyInfoClient,
         IRequestClient<CompanyRegistrationRequested> companyRegistrationClient,
-        IRequestClient<CompanyDeregistrationRequested> companyDeregistrationClient)
+        IRequestClient<CompanyDeregistrationRequested> companyDeregistrationClient,
+        IRequestClient<ReportSalary> reportSalaryClient)
     {
         _publishEndpoint = publishEndpoint;
         _companyInfoClient = companyInfoClient;
         _companyRegistrationClient = companyRegistrationClient;
         _companyDeregistrationClient = companyDeregistrationClient;
+        _reportSalaryClient = reportSalaryClient;
     }
 
     public async Task<Company?> getCompanyFromCvr(string cvr)
@@ -40,9 +43,12 @@ public class CompanyClientService
         return null;
     }
 
-    public async Task SetEmployeeIncomeForYear(string cvr, int year, int cpr, int income)
+    public async Task<bool> SetEmployeeIncomeForYear(string cvr, int year, string cpr, int income, long? paidTax)
     {
-        await _publishEndpoint.Publish(new ReportSalary(cvr, year, cpr.ToString(), income));
+        var response = await _reportSalaryClient.GetResponse<SalaryReported, CompanyInfoNotFound>(
+            new ReportSalary(cvr, year, cpr, income, paidTax ?? 0));
+
+        return response.Is(out Response<SalaryReported>? _);
     }
 
     public async Task RegisterCompany(Company company)

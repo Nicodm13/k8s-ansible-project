@@ -130,14 +130,38 @@ public class CompanyServiceMessageFlowTests
         await bus.StartAsync();
         try
         {
-            await bus.Publish(new ReportSalary("12345678", 2026, "0101011234", 100000m));
+            using var scope = provider.CreateScope();
+            var client = scope.ServiceProvider.GetRequiredService<IRequestClient<ReportSalary>>();
+            var response = await client.GetResponse<SalaryReported>(new ReportSalary("12345678", 2026, "0101011234", 100000m, 0m));
 
             var companyInfo = await companyInfoReceived.Task.WaitAsync(TimeSpan.FromSeconds(5));
             var taxInfo = await taxInfoReported.Task.WaitAsync(TimeSpan.FromSeconds(5));
 
+            Assert.That(response.Message, Is.EqualTo(new SalaryReported("0101011234", "Acme Corp", 100000)));
             Assert.That(companyInfo, Is.EqualTo(new CompanyInfoReceived("12345678", "Acme Corp")));
             Assert.That(taxInfo.Cpr, Is.EqualTo("0101011234"));
             Assert.That(taxInfo.AnnualGrossSalary, Is.EqualTo(100000m));
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
+    }
+
+    [Test]
+    public async Task ReportSalaryRespondsWithCompanyInfoNotFoundWhenCompanyDoesNotExist()
+    {
+        await using var provider = BuildProvider(_ => { });
+        var bus = provider.GetRequiredService<IBusControl>();
+
+        await bus.StartAsync();
+        try
+        {
+            using var scope = provider.CreateScope();
+            var client = scope.ServiceProvider.GetRequiredService<IRequestClient<ReportSalary>>();
+            var response = await client.GetResponse<CompanyInfoNotFound>(new ReportSalary("99999999", 2026, "0101011234", 100000m, 0m));
+
+            Assert.That(response.Message, Is.EqualTo(new CompanyInfoNotFound("99999999")));
         }
         finally
         {
@@ -261,6 +285,7 @@ public class CompanyServiceMessageFlowTests
             busRegistrationConfigurator.AddRequestClient<CompanyRegistrationRequested>();
             busRegistrationConfigurator.AddRequestClient<CompanyDeregistrationRequested>();
             busRegistrationConfigurator.AddRequestClient<CompanyInfoRequested>();
+            busRegistrationConfigurator.AddRequestClient<ReportSalary>();
             busRegistrationConfigurator.UsingInMemory((context, configurator) =>
             {
                 configurator.ReceiveEndpoint("company-service", endpoint =>

@@ -50,16 +50,21 @@ public class CompanyController : ControllerBase
     }
 
     [HttpPost("{cvr}/employees/income/{year}/{cpr}")]
-    public async Task<ActionResult> SetEmployeeIncomeForYear(string cvr, int year, int cpr, [FromBody] int income)
+    public async Task<ActionResult> SetEmployeeIncomeForYear(string cvr, int year, string cpr, [FromBody] int income, [FromBody] int paidTax)
     {
-        if (string.IsNullOrWhiteSpace(cvr) || year <= 0 || cpr <= 0 || income < 0)
+        if (string.IsNullOrWhiteSpace(cvr))
         {
             return BadRequest("CVR, year, CPR, and income must be valid.");
         }
 
         try
         {
-            await _companyService.SetEmployeeIncomeForYear(cvr, year, cpr, income);
+            var success = await _companyService.SetEmployeeIncomeForYear(cvr, year, cpr, income, paidTax);
+            if (!success)
+            {
+                return NotFound($"Company with CVR '{cvr}' was not found.");
+            }
+
             return Ok("Employee income reported successfully.");
         }
         catch (NotImplementedException)
