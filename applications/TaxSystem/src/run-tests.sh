@@ -16,6 +16,7 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 TAXSYSTEM_MANIFEST_DIR="$REPO_ROOT/applications/TaxSystem"
+TEST_MANIFEST_DIR="$REPO_ROOT/applications/TaxSystem/test-manifests"
 
 case "$SCRIPT_DIR" in
   /mnt/*|/media/*)
@@ -192,71 +193,7 @@ kubectl create namespace taxsystem --dry-run=client -o yaml | kubectl apply -f -
 echo "  Waiting for namespace taxsystem..."
 kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/taxsystem --timeout=15s
 
-cat > "$TMP_MANIFEST_DIR/rabbitmq.yaml" <<'EOF'
-apiVersion: v1
-kind: Secret
-metadata:
-  name: rabbitmq
-  namespace: taxsystem
-type: Opaque
-stringData:
-  rabbitmq-password: taxsystem-dev
----
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: rabbitmq
-  namespace: taxsystem
-  labels:
-    app: rabbitmq
-spec:
-  replicas: 1
-  selector:
-    matchLabels:
-      app: rabbitmq
-  template:
-    metadata:
-      labels:
-        app: rabbitmq
-    spec:
-      containers:
-        - name: rabbitmq
-          image: rabbitmq:3-management-alpine
-          ports:
-            - containerPort: 5672
-            - containerPort: 15672
-          env:
-            - name: RABBITMQ_DEFAULT_USER
-              value: taxsystem
-            - name: RABBITMQ_DEFAULT_PASS
-              valueFrom:
-                secretKeyRef:
-                  name: rabbitmq
-                  key: rabbitmq-password
-          readinessProbe:
-            tcpSocket:
-              port: 5672
-            initialDelaySeconds: 10
-            periodSeconds: 5
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: rabbitmq
-  namespace: taxsystem
-spec:
-  selector:
-    app: rabbitmq
-  ports:
-    - name: amqp
-      port: 5672
-      targetPort: 5672
-    - name: management
-      port: 15672
-      targetPort: 15672
-EOF
-
-kubectl apply -f "$TMP_MANIFEST_DIR/rabbitmq.yaml"
+kubectl apply -f "$TEST_MANIFEST_DIR/rabbitmq.yaml"
 
 # Apply credentials first (needed by cluster and services)
 kubectl apply -f "$TAXSYSTEM_MANIFEST_DIR/postgres-credentials.yaml"
