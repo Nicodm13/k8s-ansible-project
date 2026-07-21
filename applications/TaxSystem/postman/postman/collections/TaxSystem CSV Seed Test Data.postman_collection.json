@@ -1,0 +1,218 @@
+{
+  "info": {
+    "_postman_id": "35ca642f-52b4-47ab-8ead-a22115ab26c9",
+    "name": "TaxSystem CSV Seed Test Data",
+    "description": "Seeds companies and citizens from taxsystem-test-data.csv. Run the collection with the CSV as iteration data. A company is created only when seedCompany=true; one citizen is created per row.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Avoid making the same health request for every CSV row.",
+              "if (pm.info.iteration > 0) {",
+              "  pm.execution.skipRequest();",
+              "}"
+            ],
+            "id": "38e12cba-1890-4916-b615-b7a6ecf647c1"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"API is healthy\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ],
+            "id": "e24d446d-4de1-4b18-920b-2cc44eb2328d"
+          }
+        }
+      ],
+      "id": "de8219f7-632d-4908-9dc2-8df501f42f6f",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/healthz",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "healthz"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Seed Company",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const shouldSeed = String(pm.iterationData.get(\"seedCompany\") || \"\")",
+              "  .trim()",
+              "  .toLowerCase() === \"true\";",
+              "",
+              "if (!shouldSeed) {",
+              "  pm.execution.skipRequest();",
+              "} else {",
+              "  const required = [\"cvr\", \"companyName\"];",
+              "  const missing = required.filter((key) => {",
+              "    const value = pm.iterationData.get(key);",
+              "    return value === undefined || value === null || String(value).trim() === \"\";",
+              "  });",
+              "",
+              "  if (missing.length > 0) {",
+              "    throw new Error(`CSV row ${pm.info.iteration + 1} is missing: ${missing.join(\", \")}`);",
+              "  }",
+              "",
+              "  pm.variables.set(\"cvr\", String(pm.iterationData.get(\"cvr\")));",
+              "  pm.variables.set(\"companyName\", String(pm.iterationData.get(\"companyName\")));",
+              "  console.log(`Seeding company row ${pm.info.iteration + 1}: ${pm.variables.get(\"cvr\")} ${pm.variables.get(\"companyName\")}`);",
+              "}"
+            ],
+            "id": "d0cd77cb-96b3-4b15-a3e9-ed04c7256af6"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"company seed response is acceptable\", () => {",
+              "  if (![200, 201, 202, 409].includes(pm.response.code)) {",
+              "    console.error(`Company seed failed with ${pm.response.code}: ${pm.response.text()}`);",
+              "  }",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 409]);",
+              "});"
+            ],
+            "id": "8647c990-c103-4057-a5f4-b961a2a383d9"
+          }
+        }
+      ],
+      "id": "f722caa3-a7a8-49fe-9390-6c17ec2a42d4",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"CVR\": \"{{cvr}}\",\n  \"Name\": \"{{companyName}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/Company",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Company"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Seed Citizen",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const required = [",
+              "  \"firstName\", \"lastName\", \"cpr\", \"streetAddress\",",
+              "  \"city\", \"zipCode\", \"bankAccountNumber\"",
+              "];",
+              "",
+              "const missing = required.filter((key) => {",
+              "  const value = pm.iterationData.get(key);",
+              "  return value === undefined || value === null || String(value).trim() === \"\";",
+              "});",
+              "",
+              "if (missing.length > 0) {",
+              "  throw new Error(`CSV row ${pm.info.iteration + 1} is missing: ${missing.join(\", \")}`);",
+              "}",
+              "",
+              "for (const key of required) {",
+              "  pm.variables.set(key, String(pm.iterationData.get(key)));",
+              "}",
+              "console.log(`Seeding citizen row ${pm.info.iteration + 1}: ${pm.variables.get(\"cpr\")} ${pm.variables.get(\"firstName\")} ${pm.variables.get(\"lastName\")}`);"
+            ],
+            "id": "f6c2e8c3-1f41-4aa7-bb51-3eee69c992a2"
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"citizen seed response is acceptable\", () => {",
+              "  if (![200, 201, 202, 409].includes(pm.response.code)) {",
+              "    console.error(`Citizen seed failed with ${pm.response.code}: ${pm.response.text()}`);",
+              "  }",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 409]);",
+              "});"
+            ],
+            "id": "7262aa7f-8c63-441b-acda-80c6e1df497d"
+          }
+        }
+      ],
+      "id": "36529d1b-f9f4-45f6-b71e-83eec372ec1d",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"{{firstName}}\",\n  \"lastName\": \"{{lastName}}\",\n  \"cpr\": \"{{cpr}}\",\n  \"streetAddress\": \"{{streetAddress}}\",\n  \"city\": \"{{city}}\",\n  \"zipCode\": \"{{zipCode}}\",\n  \"bankAccountNumber\": \"{{bankAccountNumber}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/Citizen",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Citizen"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "id": "4d2ba94f-5fba-47dd-a94b-4c21ea4a3e7f",
+      "key": "baseUrl",
+      "value": "https://taxsystem.kvikit.dk",
+      "type": "string"
+    }
+  ]
+}
