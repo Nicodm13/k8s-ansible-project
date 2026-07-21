@@ -9,3 +9,4 @@ resources:
   - company-service.yaml
   - bank-service.yaml
   - statementgenerator-service.yaml
+  - ingress.yaml
