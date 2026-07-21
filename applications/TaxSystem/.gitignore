@@ -16,7 +16,3 @@ TestResults/
 
 # Reqnroll / SpecFlow generated files
 *.feature.cs
-
-# Generated Postman CSV shards for parallel stress runs
-postman/data/shards/
-
