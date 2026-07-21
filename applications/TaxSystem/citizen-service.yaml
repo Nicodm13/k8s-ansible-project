@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: citizen-service
-          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-citizen-service:9e85dfd44f52a449249b99c0a44ba77bd5f3e933
+          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-citizen-service:a1dfce8f912afda1a2be9624fab531c4dee70290
           imagePullPolicy: IfNotPresent
           env:
             - name: TAXSYSTEM_DATA_PATH
