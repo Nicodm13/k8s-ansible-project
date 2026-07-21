@@ -9,6 +9,17 @@ namespace TaxSystem.StatementGenerator.Services;
 public class StatementGeneratorService
 {
     private const decimal TaxRate = 0.37m;
+
+    // Percentage of a reported deductible amount that is actually tax-deductible, per
+    // TaxSystem.Shared.Models.Deductible.DeductionType. Unknown/unrecognized deduction
+    // types are treated as fully deductible (100%).
+    private static readonly IReadOnlyDictionary<string, decimal> DeductionPercentages =
+        new Dictionary<string, decimal>(StringComparer.OrdinalIgnoreCase)
+        {
+            ["CharitableDonations"] = 0.5m,
+            ["Commuting"] = 0.3m
+        };
+
     private readonly IReadStatementRepository _readStatementRepository;
     private readonly IWriteStatementRepository _writeStatementRepository;
 
@@ -18,6 +29,12 @@ public class StatementGeneratorService
     {
         _readStatementRepository = readStatementRepository;
         _writeStatementRepository = writeStatementRepository;
+    }
+
+    public static decimal CalculateDeductibleAmount(decimal amount, string deductionType)
+    {
+        var percentage = DeductionPercentages.TryGetValue(deductionType, out var value) ? value : 1m;
+        return amount * percentage;
     }
 
     public async Task RecordTaxInfoAsync(TaxInfoReported taxInfo)

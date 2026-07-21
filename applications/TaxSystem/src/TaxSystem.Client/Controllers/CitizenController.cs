@@ -64,22 +64,27 @@ public class CitizenController : ControllerBase
     //     }
     // }
 
-    [HttpPost("{citizenId}/deductibles/{year}")]
-    public IActionResult ReportDeductible(int citizenId, int year, [FromBody] List<Deductible> deductibles)
+    [HttpPost("{cpr}/deductibles/{year}")]
+    public async Task<IActionResult> ReportDeductible(string cpr, int year, [FromBody] List<Deductible> deductibles)
     {
-        if (citizenId <= 0 || year <= 0 || deductibles == null || deductibles.Count == 0)
+        if (string.IsNullOrWhiteSpace(cpr) || year <= 0 || deductibles == null || deductibles.Count == 0)
         {
-            return BadRequest("Citizen ID, year, and deductibles must be valid.");
+            return BadRequest("CPR, year, and deductibles must be valid.");
         }
 
         try
         {
-            _citizenClientService.ReportDeductibles(citizenId, year, deductibles);
+            var success = await _citizenClientService.ReportDeductibles(cpr, year, deductibles);
+            if (!success)
+            {
+                return StatusCode(StatusCodes.Status502BadGateway, "Failed to report deductibles.");
+            }
+
             return Ok("Deductibles reported successfully.");
         }
-        catch (NotImplementedException)
+        catch (RequestTimeoutException ex)
         {
-            return StatusCode(StatusCodes.Status501NotImplemented, "Deductible reporting is not implemented yet.");
+            return StatusCode(StatusCodes.Status504GatewayTimeout, ex.Message);
         }
         catch (Exception)
         {
