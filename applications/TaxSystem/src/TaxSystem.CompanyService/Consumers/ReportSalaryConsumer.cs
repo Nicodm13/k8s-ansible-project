@@ -25,11 +25,11 @@ public class ReportSalaryConsumer : IConsumer<ReportSalary>
         await context.Publish(new CompanyInfoReceived(company.CVR, company.Name));
         await context.Publish(new TaxInfoReported(
             context.Message.Cpr,
-            string.Empty,
+            null,
             context.Message.Income,
-            0m,
-            0m,
-            0m));
+            null,
+            null,
+            context.Message.PaidTax));
 
         await context.RespondAsync(new SalaryReported(context.Message.Cpr, company.Name, (int)context.Message.Income));
     }

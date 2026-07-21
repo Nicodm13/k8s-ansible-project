@@ -221,7 +221,7 @@ if ! helm upgrade --install cnpg-operator cnpg/cloudnative-pg \
   --set resources.limits.memory=128Mi \
   --set resources.limits.cpu=200m \
   --wait \
-  --timeout 120s; then
+  --timeout 90s; then
   echo "✗ CloudNativePG Helm install failed"
   kubectl get pods,deployments -n cnpg-system
   kubectl describe deployment -l app.kubernetes.io/instance=cnpg-operator -n cnpg-system 2>&1 || true
@@ -285,8 +285,8 @@ echo "  Pre-pulling CloudNativePG PostgreSQL image..."
 docker pull ghcr.io/cloudnative-pg/postgresql:16.4 || true
 echo "  Deploying PostgreSQL cluster..."
 kubectl apply -f "$TAXSYSTEM_MANIFEST_DIR/postgres-cluster.yaml"
-echo "  Waiting for PostgreSQL cluster to be ready (up to 120s)..."
-kubectl wait --for=condition=Ready cluster/taxsystem-db -n taxsystem --timeout=120s
+echo "  Waiting for PostgreSQL cluster to be ready (up to 60s)..."
+kubectl wait --for=condition=Ready cluster/taxsystem-db -n taxsystem --timeout=60s
 if [ $? -ne 0 ]; then
   echo "✗ PostgreSQL cluster not ready"
   kubectl get cluster -n taxsystem
