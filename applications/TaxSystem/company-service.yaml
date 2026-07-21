@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: company-service
-          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-company-service:9d62b5d229249809a432ee3168a9a2ca63846c6f
+          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-company-service:6c8c5c027d0dc8276a56e22a3a22edfa013dbdad
           imagePullPolicy: IfNotPresent
           env:
             - name: TAXSYSTEM_DATA_PATH
