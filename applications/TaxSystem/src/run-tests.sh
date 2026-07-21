@@ -187,7 +187,7 @@ helm repo update cnpg >/dev/null
 if ! helm upgrade --install cnpg-operator cnpg/cloudnative-pg \
   --namespace cnpg-system \
   --create-namespace \
-  --version '>=0.23.0 <1.0.0' \
+  --version 0.23.2 \
   --set resources.requests.memory=64Mi \
   --set resources.requests.cpu=50m \
   --set resources.limits.memory=128Mi \
@@ -196,11 +196,11 @@ if ! helm upgrade --install cnpg-operator cnpg/cloudnative-pg \
   --timeout 120s; then
   echo "✗ CloudNativePG Helm install failed"
   kubectl get pods,deployments -n cnpg-system
-  kubectl describe deployment cnpg-controller-manager -n cnpg-system 2>&1 || true
-  kubectl logs deployment/cnpg-controller-manager -n cnpg-system --tail=100 2>&1 || true
+  kubectl describe deployment -l app.kubernetes.io/instance=cnpg-operator -n cnpg-system 2>&1 || true
+  kubectl logs deployment -l app.kubernetes.io/instance=cnpg-operator -n cnpg-system --tail=100 2>&1 || true
   exit 1
 fi
-kubectl wait --for=condition=Available deployment/cnpg-controller-manager -n cnpg-system --timeout=60s
+kubectl wait --for=condition=Available deployment -l app.kubernetes.io/instance=cnpg-operator -n cnpg-system --timeout=60s
 if [ $? -ne 0 ]; then echo "✗ CloudNativePG operator not ready"; exit 1; fi
 echo "  ✓ CloudNativePG operator ready."
 
