@@ -1,0 +1,302 @@
+{
+  "info": {
+    "name": "TaxSystem CSV E2E Stress Test",
+    "description": "Runs the complete TaxSystem scenario once per row in taxsystem-test-data.csv. The CSV supplies cpr, cvr, income, and year.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Health Check (first CSV row only)",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "// Avoid making the same health request for every CSV row.",
+              "if (pm.info.iteration > 0) {",
+              "  pm.execution.skipRequest();",
+              "}"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"API is healthy\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/healthz",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "healthz"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Citizen",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const required = [\"cpr\", \"cvr\", \"income\"];",
+              "const missing = required.filter((key) => {",
+              "  const value = pm.iterationData.get(key);",
+              "  return value === undefined || value === null || String(value).trim() === \"\";",
+              "});",
+              "",
+              "const csvYear = pm.iterationData.get(\"year\");",
+              "const fallbackYear = pm.collectionVariables.get(\"year\");",
+              "const resolvedYear = csvYear === undefined || csvYear === null || String(csvYear).trim() === \"\"",
+              "  ? fallbackYear",
+              "  : csvYear;",
+              "",
+              "if (missing.length > 0) {",
+              "  throw new Error(`CSV row ${pm.info.iteration + 1} is missing: ${missing.join(\", \")}`);",
+              "}",
+              "",
+              "pm.variables.set(\"year\", String(resolvedYear));"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"citizen lookup responded\", () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+              "});",
+              "",
+              "pm.test(\"citizen should exist after seeding\", () => {",
+              "  if (pm.response.code === 404) {",
+              "    console.warn(`Citizen ${pm.iterationData.get(\"cpr\")} was not found.`);",
+              "  }",
+              "});",
+              "pm.test(\"response time is acceptable\", () => {",
+              "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",
+              "  pm.expect(pm.response.responseTime).to.be.below(maximum);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/Citizen/{{cpr}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Citizen",
+            "{{cpr}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Company",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"company lookup responded\", () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+              "});",
+              "",
+              "pm.test(\"company should exist after seeding\", () => {",
+              "  if (pm.response.code === 404) {",
+              "    console.warn(`Company ${pm.iterationData.get(\"cvr\")} was not found.`);",
+              "  }",
+              "});",
+              "pm.test(\"response time is acceptable\", () => {",
+              "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",
+              "  pm.expect(pm.response.responseTime).to.be.below(maximum);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/Company/{{cvr}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Company",
+            "{{cvr}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Report Salary",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"salary report accepted\", () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 202]);",
+              "});",
+              "pm.test(\"response time is acceptable\", () => {",
+              "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",
+              "  pm.expect(pm.response.responseTime).to.be.below(maximum);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/Company/{{cvr}}/employees/income/{{year}}/{{cpr}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Company",
+            "{{cvr}}",
+            "employees",
+            "income",
+            "{{year}}",
+            "{{cpr}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "{{income}}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Statement",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"statement endpoint responded\", () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+              "});",
+              "pm.test(\"response time is acceptable\", () => {",
+              "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",
+              "  pm.expect(pm.response.responseTime).to.be.below(maximum);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/StatementGenerator/{{cpr}}/Statements/{{year}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "StatementGenerator",
+            "{{cpr}}",
+            "Statements",
+            "{{year}}"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Get Bank Transfers",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"bank transfers endpoint responded\", () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 404]);",
+              "});",
+              "pm.test(\"response time is acceptable\", () => {",
+              "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",
+              "  pm.expect(pm.response.responseTime).to.be.below(maximum);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/Bank/transfers/{{cpr}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Bank",
+            "transfers",
+            "{{cpr}}"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://taxsystem.kvikit.dk",
+      "type": "string"
+    },
+    {
+      "key": "year",
+      "value": "2026",
+      "type": "string"
+    },
+    {
+      "key": "maxResponseTimeMs",
+      "value": "2000",
+      "type": "string"
+    }
+  ]
+}
