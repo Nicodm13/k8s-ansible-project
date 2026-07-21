@@ -1,16 +1,4 @@
 # CloudNativePG Cluster for TaxSystem
-#
-# Deploys a PostgreSQL 16 cluster with:
-# - 1 primary + 1 synchronous replica (2 instances)
-# - Synchronous replication (no data loss on failover)
-# - Automatic failover managed by the CloudNativePG operator
-# - Init SQL to create per-service databases
-#
-# Services created automatically by CloudNativePG:
-# - taxsystem-db-rw  : always routes to current primary (writes)
-# - taxsystem-db-ro  : load-balances across healthy replicas (reads)
-# - taxsystem-db-r   : routes to any instance (primary + replicas)
-#
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -21,10 +9,6 @@ spec:
 
   imageName: ghcr.io/cloudnative-pg/postgresql:16.4
 
-  # imagePullPolicy not set — let the operator manage it (defaults to IfNotPresent)
-
-  # Synchronous replication: ensures no data loss on failover
-  # At least 1 replica must confirm writes before they're acknowledged
   postgresql:
     synchronous:
       method: any
@@ -36,7 +20,6 @@ spec:
       effective_cache_size: "128MB"
       synchronous_commit: "on"
 
-  # Resource limits per instance
   resources:
     requests:
       memory: "128Mi"
@@ -45,11 +28,9 @@ spec:
       memory: "256Mi"
       cpu: "500m"
 
-  # Persistent storage per instance
   storage:
     size: 2Gi
 
-  # Bootstrap: create the cluster with initial databases
   bootstrap:
     initdb:
       database: taxsystem
@@ -62,7 +43,5 @@ spec:
         - CREATE DATABASE bank_db OWNER taxsystem;
         - CREATE DATABASE statement_db OWNER taxsystem;
 
-  # Monitoring (optional, lightweight)
   monitoring:
     enablePodMonitor: false
-

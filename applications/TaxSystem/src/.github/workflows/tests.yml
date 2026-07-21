@@ -63,77 +63,11 @@ jobs:
           minikube-version: 'latest'
           driver: docker
 
-      - name: Build solution and publish services
+      - name: Run E2E test runner
         working-directory: ${{ env.SOLUTION_DIR }}
         run: |
-          dotnet build TaxSystem.sln --configuration Release
-          for proj in TaxSystem.Client TaxSystem.CitizenService TaxSystem.CompanyService \
-                      TaxSystem.AuditService TaxSystem.StatementGeneratorService; do
-            dotnet publish "$proj/$proj.csproj" --configuration Release --no-build \
-              -o "publish/$proj" /p:UseAppHost=false
-          done
-
-      - name: Build Docker images inside Minikube (parallel)
-        working-directory: ${{ env.SOLUTION_DIR }}
-        run: |
-          eval $(minikube docker-env)
-          docker build -q -f TaxSystem.Client/Dockerfile -t taxsystem-client:latest . &
-          docker build -q -f TaxSystem.CitizenService/Dockerfile -t taxsystem-citizen-service:latest . &
-          docker build -q -f TaxSystem.CompanyService/Dockerfile -t taxsystem-company-service:latest . &
-          docker build -q -f TaxSystem.AuditService/Dockerfile -t taxsystem-audit-service:latest . &
-          docker build -q -f TaxSystem.StatementGeneratorService/Dockerfile -t taxsystem-statementgenerator-service:latest . &
-          wait
-
-      - name: Deploy to Minikube
-        working-directory: ${{ env.SOLUTION_DIR }}
-        run: |
-          kubectl apply -f k8s/rabbitmq.yaml
-          kubectl apply -f k8s/citizen-service.yaml
-          kubectl apply -f k8s/company-service.yaml
-          kubectl apply -f k8s/audit-service.yaml
-          kubectl apply -f k8s/statementgenerator-service.yaml
-          kubectl apply -f k8s/client.yaml
-
-      - name: Wait for RabbitMQ to be ready
-        run: |
-          kubectl wait --for=condition=ready pod -l app=rabbitmq --timeout=120s
-
-      - name: Wait for Client to be ready
-        run: |
-          kubectl wait --for=condition=ready pod -l app=client --timeout=120s || true
-
-      - name: Get Client service URL
-        id: client-url
-        run: |
-          CLIENT_URL=$(minikube service client --url)
-          echo "CLIENT_BASE_URL=$CLIENT_URL" >> $GITHUB_ENV
-          echo "Client URL: $CLIENT_URL"
-
-      - name: Get RabbitMQ connection info
-        run: |
-          RABBITMQ_URL=$(minikube service rabbitmq --url --format={{.IP}}:{{.Port}} | head -1)
-          RABBITMQ_HOST=$(echo $RABBITMQ_URL | cut -d: -f1)
-          RABBITMQ_PORT=$(echo $RABBITMQ_URL | cut -d: -f2)
-          echo "RABBITMQ_HOST=$RABBITMQ_HOST" >> $GITHUB_ENV
-          echo "RABBITMQ_PORT=$RABBITMQ_PORT" >> $GITHUB_ENV
-
-      - name: Restore dependencies
-        working-directory: ${{ env.SOLUTION_DIR }}
-        run: dotnet restore TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj
-
-      - name: Build
-        working-directory: ${{ env.SOLUTION_DIR }}
-        run: dotnet build TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj --no-restore
-
-      - name: Run E2E tests
-        working-directory: ${{ env.SOLUTION_DIR }}
-        env:
-          CLIENT_BASE_URL: ${{ env.CLIENT_BASE_URL }}
-          RABBITMQ_HOST: ${{ env.RABBITMQ_HOST }}
-          RABBITMQ_PORT: ${{ env.RABBITMQ_PORT }}
-          RABBITMQ_USERNAME: guest
-          RABBITMQ_PASSWORD: guest
-        run: dotnet test TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj --no-build --logger "trx;LogFileName=e2e-results.trx"
+          chmod +x ./run-tests.sh
+          ./run-tests.sh --skip-unit
 
       - name: Dump pod logs on failure
         if: failure()

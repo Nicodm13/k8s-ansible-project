@@ -1,16 +1,3 @@
-# CloudNativePG Operator - Flux HelmRelease
-#
-# This file is applied by Flux in production but skipped by run-tests.sh (CI uses kubectl apply --server-side instead).
----
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: cnpg
-  namespace: flux-system
-spec:
-  interval: 24h
-  url: https://cloudnative-pg.github.io/charts
----
 apiVersion: helm.toolkit.fluxcd.io/v2
 kind: HelmRelease
 metadata:
@@ -28,7 +15,7 @@ spec:
         namespace: flux-system
   install:
     crds: CreateReplace
-    createNamespace: true
+    createNamespace: false
     remediation:
       retries: 3
   upgrade:
@@ -43,4 +30,3 @@ spec:
       limits:
         memory: "128Mi"
         cpu: "200m"
-

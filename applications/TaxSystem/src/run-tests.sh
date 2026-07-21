@@ -14,6 +14,8 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+TAXSYSTEM_MANIFEST_DIR="$REPO_ROOT/applications/TaxSystem"
 
 case "$SCRIPT_DIR" in
   /mnt/*|/media/*)
@@ -166,6 +168,9 @@ echo "✓ All images built (parallel)."
 echo ""
 echo "[5/7] Deploying K8s manifests..."
 
+TMP_MANIFEST_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_MANIFEST_DIR"' EXIT
+
 # Clean up existing deployments
 kubectl delete deployments --all -n taxsystem --ignore-not-found --wait=true
 kubectl delete statefulsets --all -n taxsystem --ignore-not-found --wait=true
@@ -183,20 +188,84 @@ if [ $? -ne 0 ]; then echo "✗ CloudNativePG operator not ready"; exit 1; fi
 echo "  ✓ CloudNativePG operator ready."
 
 # Ensure namespace exists
-kubectl apply -f "$SCRIPT_DIR/k8s/cnpg-operator-install.yaml"
 kubectl create namespace taxsystem --dry-run=client -o yaml | kubectl apply -f -
 echo "  Waiting for namespace taxsystem..."
 kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/taxsystem --timeout=15s
 
+cat > "$TMP_MANIFEST_DIR/rabbitmq.yaml" <<'EOF'
+apiVersion: v1
+kind: Secret
+metadata:
+  name: rabbitmq
+  namespace: taxsystem
+type: Opaque
+stringData:
+  rabbitmq-password: taxsystem-dev
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: rabbitmq
+  namespace: taxsystem
+  labels:
+    app: rabbitmq
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: rabbitmq
+  template:
+    metadata:
+      labels:
+        app: rabbitmq
+    spec:
+      containers:
+        - name: rabbitmq
+          image: rabbitmq:3-management-alpine
+          ports:
+            - containerPort: 5672
+            - containerPort: 15672
+          env:
+            - name: RABBITMQ_DEFAULT_USER
+              value: taxsystem
+            - name: RABBITMQ_DEFAULT_PASS
+              valueFrom:
+                secretKeyRef:
+                  name: rabbitmq
+                  key: rabbitmq-password
+          readinessProbe:
+            tcpSocket:
+              port: 5672
+            initialDelaySeconds: 10
+            periodSeconds: 5
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: rabbitmq
+  namespace: taxsystem
+spec:
+  selector:
+    app: rabbitmq
+  ports:
+    - name: amqp
+      port: 5672
+      targetPort: 5672
+    - name: management
+      port: 15672
+      targetPort: 15672
+EOF
+
+kubectl apply -f "$TMP_MANIFEST_DIR/rabbitmq.yaml"
+
 # Apply credentials first (needed by cluster and services)
-kubectl apply -f "$SCRIPT_DIR/k8s/postgres-credentials.yaml"
-kubectl apply -f "$SCRIPT_DIR/k8s/rabbitmq-credentials.yaml"
+kubectl apply -f "$TAXSYSTEM_MANIFEST_DIR/postgres-credentials.yaml"
 
 # Deploy PostgreSQL cluster
 echo "  Pre-pulling CloudNativePG PostgreSQL image..."
 docker pull ghcr.io/cloudnative-pg/postgresql:16.4 || true
 echo "  Deploying PostgreSQL cluster..."
-kubectl apply -f "$SCRIPT_DIR/k8s/postgres-cluster.yaml"
+kubectl apply -f "$TAXSYSTEM_MANIFEST_DIR/postgres-cluster.yaml"
 echo "  Waiting for PostgreSQL cluster to be ready (up to 120s)..."
 kubectl wait --for=condition=Ready cluster/taxsystem-db -n taxsystem --timeout=120s
 if [ $? -ne 0 ]; then
@@ -207,14 +276,19 @@ if [ $? -ne 0 ]; then
 fi
 echo "  ✓ PostgreSQL cluster ready."
 
-# Apply all remaining manifests (deployments, services, etc.)
-# Skip Flux-only resources (cnpg-helm-release.yaml) — CI installs the operator directly above.
-for manifest in "$SCRIPT_DIR"/k8s/*.yaml; do
-  case "$(basename "$manifest")" in
-    cnpg-helm-release.yaml) continue ;;  # Flux-only, skip in CI
-  esac
-  kubectl apply -f "$manifest" || true
-done
+# Apply root manifests with Minikube-local images.
+kubectl kustomize "$TAXSYSTEM_MANIFEST_DIR" \
+  | sed \
+      -e 's#image: ghcr.io/.*/taxsystem-client:.*#image: taxsystem-client:latest#' \
+      -e 's#image: ghcr.io/.*/taxsystem-citizen-service:.*#image: taxsystem-citizen-service:latest#' \
+      -e 's#image: ghcr.io/.*/taxsystem-company-service:.*#image: taxsystem-company-service:latest#' \
+      -e 's#image: ghcr.io/.*/taxsystem-bank-service:.*#image: taxsystem-bank-service:latest#' \
+      -e 's#image: ghcr.io/.*/taxsystem-statementgenerator-service:.*#image: taxsystem-statementgenerator-service:latest#' \
+      -e 's/imagePullPolicy: IfNotPresent/imagePullPolicy: Never/g' \
+  > "$TMP_MANIFEST_DIR/taxsystem.yaml"
+
+kubectl apply -f "$TMP_MANIFEST_DIR/taxsystem.yaml"
+kubectl patch service client -n taxsystem --type merge -p '{"spec":{"type":"NodePort"}}'
 echo "✓ Manifests applied."
 
 # ─── Step 6: Wait for pods ───────────────────────────────────────────────────
@@ -289,8 +363,8 @@ echo "  CLIENT_BASE_URL = $CLIENT_BASE_URL"
 
 export RABBITMQ_HOST="localhost"
 export RABBITMQ_PORT="35672"
-export RABBITMQ_USERNAME="guest"
-export RABBITMQ_PASSWORD="guest"
+export RABBITMQ_USERNAME="taxsystem"
+export RABBITMQ_PASSWORD="taxsystem-dev"
 echo "  RABBITMQ = $RABBITMQ_HOST:$RABBITMQ_PORT"
 
 cleanup() {
