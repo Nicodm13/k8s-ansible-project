@@ -19,6 +19,17 @@
 
 The seed collection creates a company only when `seedCompany` is `true`. It creates one citizen for every CSV row. The health check is skipped after the first row.
 
+The E2E stress collection runs this flow for each CSV row:
+
+1. Get Citizen
+2. Report Deductible
+3. Get Company
+4. Report Salary
+5. Get Statement
+6. Get Bank Transfers
+
+The CSV includes `cpr`, `citizenId`, `cvr`, `income`, `paidTax`, `deductibleAmount`, and `year` values used by the E2E requests.
+
 ## Regenerate the package
 
 ```bash

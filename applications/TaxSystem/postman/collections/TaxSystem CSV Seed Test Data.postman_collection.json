@@ -71,10 +71,6 @@
               "  if (missing.length > 0) {",
               "    throw new Error(`CSV row ${pm.info.iteration + 1} is missing: ${missing.join(\", \")}`);",
               "  }",
-              "",
-              "  pm.variables.set(\"cvr\", String(pm.iterationData.get(\"cvr\")));",
-              "  pm.variables.set(\"companyName\", String(pm.iterationData.get(\"companyName\")));",
-              "  console.log(`Seeding company row ${pm.info.iteration + 1}: ${pm.variables.get(\"cvr\")} ${pm.variables.get(\"companyName\")}`);",
               "}"
             ]
           }
@@ -85,9 +81,6 @@
             "type": "text/javascript",
             "exec": [
               "pm.test(\"company seed response is acceptable\", () => {",
-              "  if (![200, 201, 202, 409].includes(pm.response.code)) {",
-              "    console.error(`Company seed failed with ${pm.response.code}: ${pm.response.text()}`);",
-              "  }",
               "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 409]);",
               "});"
             ]
@@ -143,12 +136,7 @@
               "",
               "if (missing.length > 0) {",
               "  throw new Error(`CSV row ${pm.info.iteration + 1} is missing: ${missing.join(\", \")}`);",
-              "}",
-              "",
-              "for (const key of required) {",
-              "  pm.variables.set(key, String(pm.iterationData.get(key)));",
-              "}",
-              "console.log(`Seeding citizen row ${pm.info.iteration + 1}: ${pm.variables.get(\"cpr\")} ${pm.variables.get(\"firstName\")} ${pm.variables.get(\"lastName\")}`);"
+              "}"
             ]
           }
         },
@@ -158,9 +146,6 @@
             "type": "text/javascript",
             "exec": [
               "pm.test(\"citizen seed response is acceptable\", () => {",
-              "  if (![200, 201, 202, 409].includes(pm.response.code)) {",
-              "    console.error(`Citizen seed failed with ${pm.response.code}: ${pm.response.text()}`);",
-              "  }",
               "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 409]);",
               "});"
             ]

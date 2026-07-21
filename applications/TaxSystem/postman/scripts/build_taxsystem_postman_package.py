@@ -58,7 +58,8 @@ SUFFIXES = ["ApS", "A/S", "I/S", "Holding ApS", "Service ApS"]
 
 CSV_HEADERS = [
     "seedCompany", "cvr", "companyName", "firstName", "lastName", "cpr",
-    "streetAddress", "city", "zipCode", "bankAccountNumber", "income", "year",
+    "citizenId", "streetAddress", "city", "zipCode", "bankAccountNumber",
+    "income", "paidTax", "deductibleAmount", "year",
 ]
 
 
@@ -113,6 +114,8 @@ def build_rows(citizens: int, companies: int, year: int) -> list[dict[str, str]]
         city, zip_code = CITIES[(index - 1) % len(CITIES)]
         house_number = ((index * 17) % 199) + 1
         income = 300_000 + ((index * 137) % 700_000)
+        paid_tax = int(income * 0.37)
+        deductible_amount = 5_000 + ((index * 47) % 25_000)
 
         rows.append({
             "seedCompany": "true" if index <= companies else "false",
@@ -121,11 +124,14 @@ def build_rows(citizens: int, companies: int, year: int) -> list[dict[str, str]]
             "firstName": FIRST_NAMES[(index - 1) % len(FIRST_NAMES)],
             "lastName": LAST_NAMES[((index - 1) // len(FIRST_NAMES)) % len(LAST_NAMES)],
             "cpr": citizen_cpr(index),
+            "citizenId": str(index),
             "streetAddress": f"{STREETS[(index - 1) % len(STREETS)]} {house_number}",
             "city": city,
             "zipCode": zip_code,
             "bankAccountNumber": f"DK{10_000_000_000_000 + index}",
             "income": str(income),
+            "paidTax": str(paid_tax),
+            "deductibleAmount": str(deductible_amount),
             "year": str(year),
         })
 
@@ -288,7 +294,7 @@ def seed_collection(base_url: str) -> dict[str, Any]:
 
 def stress_collection(base_url: str, year: int) -> dict[str, Any]:
     row_validation = [
-        'const required = ["cpr", "cvr", "income"];',
+        'const required = ["cpr", "cvr", "citizenId", "income", "paidTax", "deductibleAmount"];',
         "const missing = required.filter((key) => {",
         "  const value = pm.iterationData.get(key);",
         '  return value === undefined || value === null || String(value).trim() === "";',
@@ -319,7 +325,7 @@ def stress_collection(base_url: str, year: int) -> dict[str, Any]:
             "name": "TaxSystem CSV E2E Stress Test",
             "description": (
                 "Runs the complete TaxSystem scenario once per row in taxsystem-test-data.csv. "
-                "The CSV supplies cpr, cvr, income, and year."
+                "The CSV supplies cpr, cvr, citizenId, income, paidTax, deductibleAmount, and year."
             ),
             "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
         },
@@ -339,6 +345,25 @@ def stress_collection(base_url: str, year: int) -> dict[str, Any]:
                     "  if (pm.response.code === 404) {",
                     '    console.warn(`Citizen ${pm.iterationData.get("cpr")} was not found.`);',
                     "  }",
+                    "});",
+                    *response_time_test,
+                ],
+            ),
+            request_item(
+                "Report Deductible",
+                "POST",
+                "{{baseUrl}}/Citizen/{{citizenId}}/deductibles/{{year}}",
+                body=(
+                    '[\n'
+                    '  {\n'
+                    '    "amount": {{deductibleAmount}},\n'
+                    '    "deductionPercentage": 0.3\n'
+                    '  }\n'
+                    ']'
+                ),
+                tests=[
+                    'pm.test("deductible report handled", () => {',
+                    "  pm.expect(pm.response.code).to.be.oneOf([200, 501]);",
                     "});",
                     *response_time_test,
                 ],
@@ -364,7 +389,12 @@ def stress_collection(base_url: str, year: int) -> dict[str, Any]:
                 "Report Salary",
                 "POST",
                 "{{baseUrl}}/Company/{{cvr}}/employees/income/{{year}}/{{cpr}}",
-                body="{{income}}",
+                body=(
+                    '{\n'
+                    '  "income": {{income}},\n'
+                    '  "paidTax": {{paidTax}}\n'
+                    '}'
+                ),
                 tests=[
                     'pm.test("salary report accepted", () => {',
                     "  pm.expect(pm.response.code).to.be.oneOf([200, 202]);",
