@@ -63,6 +63,9 @@ jobs:
           minikube-version: 'latest'
           driver: docker
 
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+
       - name: Run E2E test runner
         working-directory: ${{ env.SOLUTION_DIR }}
         run: |

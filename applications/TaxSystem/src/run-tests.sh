@@ -16,7 +16,6 @@
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
 TAXSYSTEM_MANIFEST_DIR="$REPO_ROOT/applications/TaxSystem"
-TEST_MANIFEST_DIR="$REPO_ROOT/applications/TaxSystem/test-manifests"
 
 case "$SCRIPT_DIR" in
   /mnt/*|/media/*)
@@ -193,7 +192,18 @@ kubectl create namespace taxsystem --dry-run=client -o yaml | kubectl apply -f -
 echo "  Waiting for namespace taxsystem..."
 kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/taxsystem --timeout=15s
 
-kubectl apply -f "$TEST_MANIFEST_DIR/rabbitmq.yaml"
+echo "  Installing RabbitMQ Helm chart..."
+helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>&1 || true
+helm repo update bitnami >/dev/null
+helm upgrade --install rabbitmq bitnami/rabbitmq \
+  --namespace taxsystem \
+  --set auth.username=taxsystem \
+  --set auth.password=taxsystem-dev \
+  --set auth.erlangCookie=taxsystem-dev-cookie \
+  --set persistence.enabled=false \
+  --set service.type=ClusterIP \
+  --wait \
+  --timeout 120s
 
 # Apply credentials first (needed by cluster and services)
 kubectl apply -f "$TAXSYSTEM_MANIFEST_DIR/postgres-credentials.yaml"
