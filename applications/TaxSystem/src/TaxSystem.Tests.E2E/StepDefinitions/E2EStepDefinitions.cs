@@ -25,7 +25,7 @@ public sealed class E2EStepDefinitions : IDisposable
         _httpClient = new HttpClient
         {
             BaseAddress = new Uri(baseUrl),
-            Timeout = TimeSpan.FromSeconds(30)
+            Timeout = TimeSpan.FromSeconds(10)
         };
     }
 
@@ -69,7 +69,7 @@ public sealed class E2EStepDefinitions : IDisposable
         });
     }
 
-    [Given(@"the employee's annual salary is reported as (\d+)")]
+    [Given(@"the employee's annual salary is reported as (\d+) and paid tax as (\d+)")]
     public void GivenTheEmployeesAnnualSalaryIsReportedAs(int salary)
     {
         _salary = salary;

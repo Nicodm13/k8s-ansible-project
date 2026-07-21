@@ -31,6 +31,11 @@ public class StatementGeneratorServiceMessageFlowTests
     public async Task TaxInfoReportedPersistsStatementAndPublishesGenerateTaxStatement()
     {
         var generateTaxStatement = new TaskCompletionSource<GenerateTaxStatement>();
+        // Only the TaxInfoReportedConsumer is under test here, so GenerateTaxStatementConsumer
+        // is intentionally excluded. Otherwise the fanned-out GenerateTaxStatement message would
+        // also trigger GenerateTaxStatementConsumer's CitizenInfoRequested request/response, which
+        // would still be in-flight when the test tears down the bus, causing StopAsync to block
+        // until MassTransit's default 30s request timeout elapses.
         await using var provider = BuildProvider(configurator =>
         {
             configurator.ReceiveEndpoint("generate-tax-statement-test", endpoint =>
@@ -41,7 +46,7 @@ public class StatementGeneratorServiceMessageFlowTests
                     return Task.CompletedTask;
                 });
             });
-        });
+        }, includeGenerateTaxStatementConsumer: false);
         var bus = provider.GetRequiredService<IBusControl>();
 
         await bus.StartAsync();
@@ -228,7 +233,9 @@ public class StatementGeneratorServiceMessageFlowTests
         }
     }
 
-    private ServiceProvider BuildProvider(Action<IInMemoryBusFactoryConfigurator> configure)
+    private ServiceProvider BuildProvider(
+        Action<IInMemoryBusFactoryConfigurator> configure,
+        bool includeGenerateTaxStatementConsumer = true)
     {
         var services = new ServiceCollection();
         services.AddDbContext<StatementDbContext>(options =>
@@ -241,13 +248,21 @@ public class StatementGeneratorServiceMessageFlowTests
         services.AddMassTransit(busRegistrationConfigurator =>
         {
             busRegistrationConfigurator.AddConsumer<TaxInfoReportedConsumer>();
-            busRegistrationConfigurator.AddConsumer<GenerateTaxStatementConsumer>();
+            if (includeGenerateTaxStatementConsumer)
+            {
+                busRegistrationConfigurator.AddConsumer<GenerateTaxStatementConsumer>();
+            }
+
             busRegistrationConfigurator.UsingInMemory((context, configurator) =>
             {
                 configurator.ReceiveEndpoint("statement-generator-service", endpoint =>
                 {
                     endpoint.ConfigureConsumer<TaxInfoReportedConsumer>(context);
-                    endpoint.ConfigureConsumer<GenerateTaxStatementConsumer>(context);
+                    if (includeGenerateTaxStatementConsumer)
+                    {
+                        endpoint.ConfigureConsumer<GenerateTaxStatementConsumer>(context);
+                    }
+
                     endpoint.Handler<CitizenInfoRequested>(async requestContext =>
                     {
                         if (requestContext.Message.Cpr == "101011234")
