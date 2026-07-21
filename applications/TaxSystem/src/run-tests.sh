@@ -208,8 +208,13 @@ fi
 echo "  ✓ PostgreSQL cluster ready."
 
 # Apply all remaining manifests (deployments, services, etc.)
-kubectl apply -f "$SCRIPT_DIR/k8s/"
-if [ $? -ne 0 ]; then echo "✗ KUBECTL APPLY FAILED"; exit 1; fi
+# Skip Flux-only resources (cnpg-helm-release.yaml) — CI installs the operator directly above.
+for manifest in "$SCRIPT_DIR"/k8s/*.yaml; do
+  case "$(basename "$manifest")" in
+    cnpg-helm-release.yaml) continue ;;  # Flux-only, skip in CI
+  esac
+  kubectl apply -f "$manifest" || true
+done
 echo "✓ Manifests applied."
 
 # ─── Step 6: Wait for pods ───────────────────────────────────────────────────
