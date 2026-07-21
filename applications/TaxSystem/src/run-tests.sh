@@ -195,7 +195,7 @@ kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/taxsystem --timeo
 echo "  Installing RabbitMQ Helm chart..."
 helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>&1 || true
 helm repo update bitnami >/dev/null
-helm upgrade --install rabbitmq bitnami/rabbitmq \
+if ! helm upgrade --install rabbitmq bitnami/rabbitmq \
   --namespace taxsystem \
   --set auth.username=taxsystem \
   --set auth.password=taxsystem-dev \
@@ -203,7 +203,17 @@ helm upgrade --install rabbitmq bitnami/rabbitmq \
   --set persistence.enabled=false \
   --set service.type=ClusterIP \
   --wait \
-  --timeout 120s
+  --timeout 300s; then
+  echo "✗ RabbitMQ Helm install failed"
+  kubectl get pods,statefulset,svc,endpoints -n taxsystem
+  kubectl describe statefulset rabbitmq -n taxsystem 2>&1 || true
+  kubectl logs statefulset/rabbitmq -n taxsystem --tail=100 2>&1 || true
+  exit 1
+fi
+
+kubectl rollout status statefulset/rabbitmq -n taxsystem --timeout=300s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=rabbitmq -n taxsystem --timeout=300s
+echo "  ✓ RabbitMQ ready."
 
 # Apply credentials first (needed by cluster and services)
 kubectl apply -f "$TAXSYSTEM_MANIFEST_DIR/postgres-credentials.yaml"

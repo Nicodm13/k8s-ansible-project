@@ -1,3 +1,8 @@
+# CloudNativePG Operator - Flux HelmRepository
+#
+# This repository is consumed by infrastructure/database/cloudnative-pg/release.yaml.
+# Flux applies this as part of the infrastructure kustomization before applications.
+---
 apiVersion: source.toolkit.fluxcd.io/v1
 kind: HelmRepository
 metadata:
