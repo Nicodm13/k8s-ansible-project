@@ -14,6 +14,8 @@
 # ══════════════════════════════════════════════════════════════════════════════
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/../../.." && pwd)"
+TAXSYSTEM_MANIFEST_DIR="$REPO_ROOT/applications/TaxSystem"
 
 case "$SCRIPT_DIR" in
   /mnt/*|/media/*)
@@ -166,6 +168,9 @@ echo "✓ All images built (parallel)."
 echo ""
 echo "[5/7] Deploying K8s manifests..."
 
+TMP_MANIFEST_DIR="$(mktemp -d)"
+trap 'rm -rf "$TMP_MANIFEST_DIR"' EXIT
+
 # Clean up existing deployments
 kubectl delete deployments --all -n taxsystem --ignore-not-found --wait=true
 kubectl delete statefulsets --all -n taxsystem --ignore-not-found --wait=true
@@ -175,28 +180,72 @@ kubectl delete cluster taxsystem-db -n taxsystem --ignore-not-found --wait=true 
 echo "  Waiting for old database pods to terminate..."
 kubectl wait --for=delete pod -l cnpg.io/cluster=taxsystem-db -n taxsystem --timeout=60s 2>/dev/null || true
 
-# Install CloudNativePG operator (idempotent)
-echo "  Installing CloudNativePG operator..."
-kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.25/releases/cnpg-1.25.1.yaml 2>/dev/null
-kubectl wait --for=condition=Available deployment/cnpg-controller-manager -n cnpg-system --timeout=60s
+# Install CloudNativePG operator with the same Helm chart used by Flux.
+echo "  Installing CloudNativePG Helm chart..."
+helm repo add cnpg https://cloudnative-pg.github.io/charts >/dev/null 2>&1 || true
+helm repo update cnpg >/dev/null
+if ! helm upgrade --install cnpg-operator cnpg/cloudnative-pg \
+  --namespace cnpg-system \
+  --create-namespace \
+  --version 0.23.2 \
+  --set resources.requests.memory=64Mi \
+  --set resources.requests.cpu=50m \
+  --set resources.limits.memory=128Mi \
+  --set resources.limits.cpu=200m \
+  --wait \
+  --timeout 120s; then
+  echo "✗ CloudNativePG Helm install failed"
+  kubectl get pods,deployments -n cnpg-system
+  kubectl describe deployment -l app.kubernetes.io/instance=cnpg-operator -n cnpg-system 2>&1 || true
+  kubectl logs deployment -l app.kubernetes.io/instance=cnpg-operator -n cnpg-system --tail=100 2>&1 || true
+  exit 1
+fi
+kubectl wait --for=condition=Available deployment -l app.kubernetes.io/instance=cnpg-operator -n cnpg-system --timeout=60s
 if [ $? -ne 0 ]; then echo "✗ CloudNativePG operator not ready"; exit 1; fi
 echo "  ✓ CloudNativePG operator ready."
 
 # Ensure namespace exists
-kubectl apply -f "$SCRIPT_DIR/k8s/cnpg-operator-install.yaml"
 kubectl create namespace taxsystem --dry-run=client -o yaml | kubectl apply -f -
 echo "  Waiting for namespace taxsystem..."
 kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/taxsystem --timeout=15s
 
+echo "  Installing RabbitMQ Helm chart..."
+helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>&1 || true
+helm repo update bitnami >/dev/null
+if ! helm upgrade --install rabbitmq bitnami/rabbitmq \
+  --namespace taxsystem \
+  --version 16.0.14 \
+  --set global.security.allowInsecureImages=true \
+  --set image.registry=docker.io \
+  --set image.repository=bitnamilegacy/rabbitmq \
+  --set image.tag=4.1.3-debian-12-r1 \
+  --set auth.username=taxsystem \
+  --set auth.password=taxsystem-dev \
+  --set auth.erlangCookie=taxsystem-dev-cookie \
+  --set persistence.enabled=false \
+  --set resourcesPreset=small \
+  --set service.type=ClusterIP \
+  --wait \
+  --timeout 120s; then
+  echo "✗ RabbitMQ Helm install failed"
+  kubectl get pods,statefulset,svc,endpoints -n taxsystem
+  kubectl describe statefulset rabbitmq -n taxsystem 2>&1 || true
+  kubectl logs statefulset/rabbitmq -n taxsystem --tail=100 2>&1 || true
+  exit 1
+fi
+
+kubectl rollout status statefulset/rabbitmq -n taxsystem --timeout=120s
+kubectl wait --for=condition=ready pod -l app.kubernetes.io/name=rabbitmq -n taxsystem --timeout=120s
+echo "  ✓ RabbitMQ ready."
+
 # Apply credentials first (needed by cluster and services)
-kubectl apply -f "$SCRIPT_DIR/k8s/postgres-credentials.yaml"
-kubectl apply -f "$SCRIPT_DIR/k8s/rabbitmq-credentials.yaml"
+kubectl apply -f "$TAXSYSTEM_MANIFEST_DIR/postgres-credentials.yaml"
 
 # Deploy PostgreSQL cluster
 echo "  Pre-pulling CloudNativePG PostgreSQL image..."
 docker pull ghcr.io/cloudnative-pg/postgresql:16.4 || true
 echo "  Deploying PostgreSQL cluster..."
-kubectl apply -f "$SCRIPT_DIR/k8s/postgres-cluster.yaml"
+kubectl apply -f "$TAXSYSTEM_MANIFEST_DIR/postgres-cluster.yaml"
 echo "  Waiting for PostgreSQL cluster to be ready (up to 120s)..."
 kubectl wait --for=condition=Ready cluster/taxsystem-db -n taxsystem --timeout=120s
 if [ $? -ne 0 ]; then
@@ -207,14 +256,28 @@ if [ $? -ne 0 ]; then
 fi
 echo "  ✓ PostgreSQL cluster ready."
 
-# Apply all remaining manifests (deployments, services, etc.)
-# Skip Flux-only resources (cnpg-helm-release.yaml) — CI installs the operator directly above.
-for manifest in "$SCRIPT_DIR"/k8s/*.yaml; do
-  case "$(basename "$manifest")" in
-    cnpg-helm-release.yaml) continue ;;  # Flux-only, skip in CI
-  esac
-  kubectl apply -f "$manifest" || true
-done
+# Apply root manifests with Minikube-local images.
+TAXSYSTEM_RENDERED_MANIFEST="$TMP_MANIFEST_DIR/taxsystem.yaml"
+kubectl kustomize "$TAXSYSTEM_MANIFEST_DIR" \
+  | sed \
+      -e 's#image: ghcr.io/.*/taxsystem-client:.*#image: taxsystem-client:latest#' \
+      -e 's#image: ghcr.io/.*/taxsystem-citizen-service:.*#image: taxsystem-citizen-service:latest#' \
+      -e 's#image: ghcr.io/.*/taxsystem-company-service:.*#image: taxsystem-company-service:latest#' \
+      -e 's#image: ghcr.io/.*/taxsystem-bank-service:.*#image: taxsystem-bank-service:latest#' \
+      -e 's#image: ghcr.io/.*/taxsystem-statementgenerator-service:.*#image: taxsystem-statementgenerator-service:latest#' \
+      -e 's/imagePullPolicy: IfNotPresent/imagePullPolicy: Never/g' \
+  > "$TAXSYSTEM_RENDERED_MANIFEST"
+
+echo "  TaxSystem deployment images:"
+grep -E '^ *image: ' "$TAXSYSTEM_RENDERED_MANIFEST" | sed 's/^/    /'
+
+if grep -E 'image: ghcr.io/.*/taxsystem-(client|citizen-service|company-service|bank-service|statementgenerator-service):' "$TAXSYSTEM_RENDERED_MANIFEST" >/dev/null; then
+  echo "✗ Rendered TaxSystem manifests still reference production GHCR images"
+  exit 1
+fi
+
+kubectl apply -f "$TAXSYSTEM_RENDERED_MANIFEST"
+kubectl patch service client -n taxsystem --type merge -p '{"spec":{"type":"NodePort"}}'
 echo "✓ Manifests applied."
 
 # ─── Step 6: Wait for pods ───────────────────────────────────────────────────
@@ -289,8 +352,8 @@ echo "  CLIENT_BASE_URL = $CLIENT_BASE_URL"
 
 export RABBITMQ_HOST="localhost"
 export RABBITMQ_PORT="35672"
-export RABBITMQ_USERNAME="guest"
-export RABBITMQ_PASSWORD="guest"
+export RABBITMQ_USERNAME="taxsystem"
+export RABBITMQ_PASSWORD="taxsystem-dev"
 echo "  RABBITMQ = $RABBITMQ_HOST:$RABBITMQ_PORT"
 
 cleanup() {

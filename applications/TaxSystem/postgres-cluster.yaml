@@ -65,4 +65,3 @@ spec:
   # Monitoring (optional, lightweight)
   monitoring:
     enablePodMonitor: false
-

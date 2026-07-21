@@ -64,7 +64,7 @@ public sealed record CitizenRegistered(string Cpr, string Name);
 
 **Pattern**: Multi-stage builds (SDK → build → runtime-only final image):
 - Base image: `mcr.microsoft.com/dotnet/runtime:10.0` (services) or `aspnet:10.0` (Client)
-- Manifests in `k8s/` use `imagePullPolicy: Never` (images built locally in Minikube)
+- Production/GitOps manifests live in `applications/TaxSystem/`; the test runner renders them with Minikube-local image overrides when running E2E tests.
 - Services discovered via Kubernetes DNS: `{service-name}` (e.g., `citizen-service:5000`)
 - RabbitMQ runs as service `rabbitmq`; in cluster deployments the host is usually `rabbitmq.taxsystem.svc.cluster.local`
 - Persistent service data is mounted at `/var/lib/taxsystem` with `TAXSYSTEM_DATA_PATH=/var/lib/taxsystem`
@@ -107,8 +107,8 @@ export RABBITMQ_USERNAME=guest
 export RABBITMQ_PASSWORD=guest
 dotnet test TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj
 
-# Deploy to Minikube (CI does: minikube docker-env eval, then build images, then kubectl apply)
-kubectl apply -f k8s/
+# Deploy to Minikube using the root manifests with local-image overrides
+./run-tests.sh --skip-unit
 ```
 
 ## Project Dependencies & Versions
@@ -129,7 +129,7 @@ kubectl apply -f k8s/
 | Filesystem persistence | `TaxSystem.Shared/Persistance/FileSystemRepository.cs` |
 | Domain models | `TaxSystem.Shared/Models/` |
 | Test workflows | `TaxSystem.Tests/Features/` (ReportSalary.feature, RequestStatement.feature) |
-| K8s deployments | `k8s/` (all YAML manifests) |
+| K8s deployments | `../` from `src` (`applications/TaxSystem/*.yaml`) |
 | CI pipeline | repo-root `.github/workflows/` |
 | Test config | `TESTING.md` (comprehensive test documentation) |
 

@@ -22,6 +22,16 @@ spec:
           env:
             - name: TAXSYSTEM_DATA_PATH
               value: "/var/lib/taxsystem"
+            - name: TAXSYSTEM_DB_CONNECTION_WRITE
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: COMPANY_DB_CONNECTION_WRITE
+            - name: TAXSYSTEM_DB_CONNECTION_READ
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: COMPANY_DB_CONNECTION_READ
             - name: RABBITMQ_HOST
               value: "rabbitmq.taxsystem.svc.cluster.local"
             - name: RABBITMQ_PORT

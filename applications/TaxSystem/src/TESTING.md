@@ -72,23 +72,18 @@ dotnet test TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj
 
 1. **service-tests** — Runs on `ubuntu-latest`. Builds and runs `TaxSystem.Tests`. No infrastructure needed.
 2. **e2e-tests** — Spins up Minikube, builds Docker images inside Minikube's Docker daemon
-   (no registry needed), deploys all services via `kubectl apply -f k8s/`, then runs `TaxSystem.Tests.E2E`.
+   (no registry needed), deploys the root `applications/TaxSystem` manifests with local-image overrides, then runs `TaxSystem.Tests.E2E`.
 
 ### Minikube Strategy
 - Uses `medyagh/setup-minikube` GitHub Action
 - Images built with `eval $(minikube docker-env)` so they exist inside Minikube's Docker
-- K8s manifests use `imagePullPolicy: Never` to use local images
+- The test runner renders the root manifests and changes service images to local Minikube images with `imagePullPolicy: Never`.
 - `minikube service --url` exposes the Client NodePort for test access
 
 ## K8s Manifests
 
-Located in `k8s/`:
-- `rabbitmq.yaml` — RabbitMQ broker with readiness probe
-- `client.yaml` — API gateway (NodePort exposed)
-- `citizen-service.yaml`
-- `company-service.yaml`
-- `audit-service.yaml`
-- `statementgenerator-service.yaml`
+Production/GitOps manifests are located in `applications/TaxSystem/`.
+The local/CI test runner uses those same manifests and applies temporary Minikube-only overrides at runtime.
 
 ## Container Image Size
 
