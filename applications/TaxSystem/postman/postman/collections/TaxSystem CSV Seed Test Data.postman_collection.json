@@ -136,7 +136,7 @@
         {
           "listen": "prerequest",
           "script": {
-            "type": "text/javascript",
+            "id": "f6c2e8c3-1f41-4aa7-bb51-3eee69c992a2",
             "exec": [
               "const required = [",
               "  \"firstName\", \"lastName\", \"cpr\", \"streetAddress\",",
@@ -157,22 +157,27 @@
               "}",
               "console.log(`Seeding citizen row ${pm.info.iteration + 1}: ${pm.variables.get(\"cpr\")} ${pm.variables.get(\"firstName\")} ${pm.variables.get(\"lastName\")}`);"
             ],
-            "id": "f6c2e8c3-1f41-4aa7-bb51-3eee69c992a2"
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
           }
         },
         {
           "listen": "test",
           "script": {
-            "type": "text/javascript",
+            "id": "7262aa7f-8c63-441b-acda-80c6e1df497d",
             "exec": [
               "pm.test(\"citizen seed response is acceptable\", () => {",
               "  if (![200, 201, 202, 409].includes(pm.response.code)) {",
               "    console.error(`Citizen seed failed with ${pm.response.code}: ${pm.response.text()}`);",
               "  }",
               "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 409]);",
-              "});"
+              "});",
+              ""
             ],
-            "id": "7262aa7f-8c63-441b-acda-80c6e1df497d"
+            "type": "text/javascript",
+            "packages": {},
+            "requests": {}
           }
         }
       ],

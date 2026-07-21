@@ -57,6 +57,18 @@ kubectl -n taxsystem wait --for=condition=Ready cluster/taxsystem-db --timeout=1
 kubectl -n taxsystem rollout restart deployment/citizen-service deployment/company-service deployment/bank-service deployment/statementgenerator-service deployment/client
 ```
 
+The service restart is required. The reset creates empty databases, and each service creates its own tables during startup with Entity Framework `EnsureCreated`. If the services are not restarted after the new CNPG cluster is ready, requests can fail with PostgreSQL errors such as `relation "companies" does not exist` or `relation "citizens" does not exist`.
+
+Wait for the restarted services before seeding data:
+
+```bash
+kubectl -n taxsystem rollout status deployment/citizen-service
+kubectl -n taxsystem rollout status deployment/company-service
+kubectl -n taxsystem rollout status deployment/bank-service
+kubectl -n taxsystem rollout status deployment/statementgenerator-service
+kubectl -n taxsystem rollout status deployment/client
+```
+
 Verify:
 
 ```bash
