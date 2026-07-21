@@ -1,7 +1,7 @@
 {
   "info": {
     "name": "TaxSystem CSV E2E Stress Test",
-    "description": "Runs the complete TaxSystem scenario once per row in taxsystem-test-data.csv. The CSV supplies cpr, cvr, income, and year.",
+    "description": "Runs the complete TaxSystem scenario once per row in taxsystem-test-data.csv. The CSV supplies cpr, cvr, citizenId, income, paidTax, deductibleAmount, and year.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
   },
   "item": [
@@ -55,7 +55,7 @@
           "script": {
             "type": "text/javascript",
             "exec": [
-              "const required = [\"cpr\", \"cvr\", \"income\"];",
+              "const required = [\"cpr\", \"cvr\", \"citizenId\", \"income\", \"paidTax\", \"deductibleAmount\"];",
               "const missing = required.filter((key) => {",
               "  const value = pm.iterationData.get(key);",
               "  return value === undefined || value === null || String(value).trim() === \"\";",
@@ -109,6 +109,57 @@
             "Citizen",
             "{{cpr}}"
           ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Report Deductible",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"deductible report handled\", () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 501]);",
+              "});",
+              "pm.test(\"response time is acceptable\", () => {",
+              "  const maximum = Number(pm.collectionVariables.get(\"maxResponseTimeMs\") || 2000);",
+              "  pm.expect(pm.response.responseTime).to.be.below(maximum);",
+              "});"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "url": {
+          "raw": "{{baseUrl}}/Citizen/{{citizenId}}/deductibles/{{year}}",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Citizen",
+            "{{citizenId}}",
+            "deductibles",
+            "{{year}}"
+          ]
+        },
+        "body": {
+          "mode": "raw",
+          "raw": "[\n  {\n    \"amount\": {{deductibleAmount}},\n    \"deductionPercentage\": 0.3\n  }\n]",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
         }
       },
       "response": []
@@ -197,7 +248,7 @@
         },
         "body": {
           "mode": "raw",
-          "raw": "{{income}}",
+          "raw": "{\n  \"income\": {{income}},\n  \"paidTax\": {{paidTax}}\n}",
           "options": {
             "raw": {
               "language": "json"
