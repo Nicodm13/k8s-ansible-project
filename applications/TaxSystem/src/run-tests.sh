@@ -180,6 +180,22 @@ kubectl delete cluster taxsystem-db -n taxsystem --ignore-not-found --wait=true 
 echo "  Waiting for old database pods to terminate..."
 kubectl wait --for=delete pod -l cnpg.io/cluster=taxsystem-db -n taxsystem --timeout=60s 2>/dev/null || true
 
+# CloudNativePG may already be present in the cluster from a source other than this
+# script's Helm release (e.g. a previous manual `kubectl apply`, a Flux-managed install,
+# or a prior interrupted run) - its CRDs, webhooks, ClusterRoles and the operator
+# Deployment/ConfigMap are cluster-scoped and outlive `kubectl delete namespace`. If a
+# matching Helm release doesn't exist, `helm upgrade --install` fails because those
+# resources lack the "app.kubernetes.io/managed-by: Helm" ownership metadata it expects.
+# Wipe any such leftovers (dynamically, so it doesn't matter how they got there or which
+# CNPG version created them) so the chart can (re)create everything under its own release.
+if ! helm status cnpg-operator -n cnpg-system >/dev/null 2>&1; then
+  echo "  No Helm-managed cnpg-operator release found; removing pre-existing CloudNativePG resources..."
+  kubectl get crd -o name 2>/dev/null | grep -i 'cnpg\.io$' | xargs -r kubectl delete --ignore-not-found >/dev/null 2>&1 || true
+  kubectl get mutatingwebhookconfiguration,validatingwebhookconfiguration -o name 2>/dev/null | grep -i cnpg | xargs -r kubectl delete --ignore-not-found >/dev/null 2>&1 || true
+  kubectl get clusterrole,clusterrolebinding -o name 2>/dev/null | grep -i cnpg | xargs -r kubectl delete --ignore-not-found >/dev/null 2>&1 || true
+  kubectl delete namespace cnpg-system --ignore-not-found --wait=true --timeout=60s >/dev/null 2>&1 || true
+fi
+
 # Install CloudNativePG operator with the same Helm chart used by Flux.
 echo "  Installing CloudNativePG Helm chart..."
 helm repo add cnpg https://cloudnative-pg.github.io/charts >/dev/null 2>&1 || true
@@ -212,6 +228,17 @@ kubectl wait --for=jsonpath='{.status.phase}'=Active namespace/taxsystem --timeo
 echo "  Installing RabbitMQ Helm chart..."
 helm repo add bitnami https://charts.bitnami.com/bitnami >/dev/null 2>&1 || true
 helm repo update bitnami >/dev/null
+
+# release exists yet, wipe any such leftovers so the chart can (re)create them cleanly.
+if ! helm status rabbitmq -n taxsystem >/dev/null 2>&1; then
+  echo "  No Helm-managed rabbitmq release found; removing pre-existing RabbitMQ resources..."
+  kubectl delete service,configmap,secret,serviceaccount,poddisruptionbudget,role,rolebinding \
+    -n taxsystem \
+    -l 'app.kubernetes.io/name=rabbitmq' \
+    --ignore-not-found >/dev/null 2>&1 || true
+  kubectl delete service rabbitmq rabbitmq-headless -n taxsystem --ignore-not-found >/dev/null 2>&1 || true
+fi
+
 if ! helm upgrade --install rabbitmq bitnami/rabbitmq \
   --namespace taxsystem \
   --version 16.0.14 \

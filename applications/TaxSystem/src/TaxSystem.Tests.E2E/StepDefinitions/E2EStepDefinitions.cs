@@ -17,6 +17,7 @@ public sealed class E2EStepDefinitions : IDisposable
     private string? _employeeName;
     private string? _employeeCpr;
     private int _salary;
+    private long? _paidTax;
     private HttpResponseMessage? _lastResponse;
 
     public E2EStepDefinitions()
@@ -70,9 +71,10 @@ public sealed class E2EStepDefinitions : IDisposable
     }
 
     [Given(@"the employee's annual salary is reported as (\d+) and paid tax as (\d+)")]
-    public void GivenTheEmployeesAnnualSalaryIsReportedAs(int salary)
+    public void GivenTheEmployeesAnnualSalaryIsReportedAs(int salary, int paidTax)
     {
         _salary = salary;
+        _paidTax = paidTax;
     }
 
     [When(@"the statement is generated")]
@@ -80,7 +82,8 @@ public sealed class E2EStepDefinitions : IDisposable
     {
         var year = DateTime.Now.Year;
         _lastResponse = await _httpClient.PostAsJsonAsync(
-            $"/Company/{_companyCvr}/employees/income/{year}/{_employeeCpr}", _salary);
+            $"/Company/{_companyCvr}/employees/income/{year}/{_employeeCpr}",
+            new { income = _salary, paidTax = _paidTax });
     }
 
     [When(@"the salary report is generated")]

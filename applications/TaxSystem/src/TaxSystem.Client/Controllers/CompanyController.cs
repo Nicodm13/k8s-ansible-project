@@ -50,16 +50,16 @@ public class CompanyController : ControllerBase
     }
 
     [HttpPost("{cvr}/employees/income/{year}/{cpr}")]
-    public async Task<ActionResult> SetEmployeeIncomeForYear(string cvr, int year, string cpr, [FromBody] int income, [FromBody] int paidTax)
+    public async Task<ActionResult> SetEmployeeIncomeForYear(string cvr, int year, string cpr, [FromBody] SetEmployeeIncomeRequest request)
     {
-        if (string.IsNullOrWhiteSpace(cvr))
+        if (string.IsNullOrWhiteSpace(cvr) || request is null)
         {
             return BadRequest("CVR, year, CPR, and income must be valid.");
         }
 
         try
         {
-            var success = await _companyService.SetEmployeeIncomeForYear(cvr, year, cpr, income, paidTax);
+            var success = await _companyService.SetEmployeeIncomeForYear(cvr, year, cpr, request.Income, request.PaidTax);
             if (!success)
             {
                 return NotFound($"Company with CVR '{cvr}' was not found.");
@@ -114,3 +114,9 @@ public class CompanyController : ControllerBase
     }
 
 }
+
+/// <summary>
+/// Request body for reporting an employee's income and paid tax for a given year.
+/// </summary>
+public sealed record SetEmployeeIncomeRequest(int Income, long? PaidTax);
+
