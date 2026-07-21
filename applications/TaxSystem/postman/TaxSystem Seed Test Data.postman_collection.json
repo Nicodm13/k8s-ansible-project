@@ -1,0 +1,283 @@
+{
+  "info": {
+    "name": "TaxSystem Seed Test Data",
+    "description": "Seeds TaxSystem with 100 companies and 1000 citizens by looping requests inside Postman. Run with Collection Runner using 1 iteration.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Seed Start",
+      "event": [
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"API is healthy\", () => {",
+              "  pm.response.to.have.status(200);",
+              "});",
+              "",
+              "pm.collectionVariables.set(\"citizenIndex\", \"1\");",
+              "pm.collectionVariables.set(\"companyIndex\", \"1\");",
+              "",
+              "pm.execution.setNextRequest(\"Seed Company\");"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{baseUrl}}/healthz",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "healthz"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Seed Company",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const index = Number(pm.collectionVariables.get(\"companyIndex\"));",
+              "const cityNames = [",
+              "  \"Kobenhavns\", \"Aarhus\", \"Odense\", \"Aalborg\", \"Esbjerg\",",
+              "  \"Roskilde\", \"Vejle\", \"Horsens\", \"Randers\", \"Kolding\",",
+              "  \"Silkeborg\", \"Herning\", \"Hillerod\", \"Sonderborg\", \"Viborg\"",
+              "];",
+              "const industries = [",
+              "  \"Data\", \"Revision\", \"Byggeri\", \"Logistik\", \"Energi\",",
+              "  \"Handel\", \"Maskinservice\", \"Transport\", \"Konsulenter\", \"Ejendomme\",",
+              "  \"Marine Service\", \"Teknik\", \"Regnskab\", \"Installation\", \"Software\"",
+              "];",
+              "const suffixes = [",
+              "  \"ApS\", \"A/S\", \"I/S\", \"Holding ApS\", \"Service ApS\"",
+              "];",
+              "function generateCvr(companyIndex) {",
+              "  let candidate = 1000000 + companyIndex;",
+              "  while (true) {",
+              "    const firstSeven = String(candidate).padStart(7, \"0\").slice(-7);",
+              "    const weights = [2, 7, 6, 5, 4, 3, 2];",
+              "    const sum = firstSeven.split(\"\").reduce((total, digit, i) => total + Number(digit) * weights[i], 0);",
+              "    const remainder = sum % 11;",
+              "    const checkDigit = remainder === 0 ? 0 : 11 - remainder;",
+              "    if (checkDigit !== 10) {",
+              "      return `${firstSeven}${checkDigit}`;",
+              "    }",
+              "    candidate++;",
+              "  }",
+              "}",
+              "const cvr = generateCvr(index);",
+              "const city = cityNames[(index - 1) % cityNames.length];",
+              "const industry = industries[Math.floor((index - 1) / cityNames.length) % industries.length];",
+              "const suffix = suffixes[Math.floor((index - 1) / (cityNames.length * industries.length)) % suffixes.length];",
+              "const companyName = `${city} ${industry} ${suffix}`;",
+              "",
+              "pm.variables.set(\"cvr\", cvr);",
+              "pm.variables.set(\"companyName\", companyName);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"company seed response is acceptable\", () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 409]);",
+              "});",
+              "",
+              "const index = Number(pm.collectionVariables.get(\"companyIndex\"));",
+              "const target = Number(pm.collectionVariables.get(\"companyTarget\"));",
+              "",
+              "if (index < target) {",
+              "  pm.collectionVariables.set(\"companyIndex\", String(index + 1));",
+              "  pm.execution.setNextRequest(\"Seed Company\");",
+              "} else {",
+              "  pm.execution.setNextRequest(\"Seed Citizen\");",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"CVR\": \"{{cvr}}\",\n  \"Name\": \"{{companyName}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/Company",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Company"
+          ]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Seed Citizen",
+      "event": [
+        {
+          "listen": "prerequest",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "const index = Number(pm.collectionVariables.get(\"citizenIndex\"));",
+              "const firstNames = [",
+              "  \"Anders\", \"Mette\", \"Lars\", \"Sofie\", \"Nikolaj\", \"Camilla\",",
+              "  \"Frederik\", \"Julie\", \"Mikkel\", \"Emma\", \"Christian\", \"Ida\",",
+              "  \"Rasmus\", \"Maria\", \"Peter\", \"Line\", \"Jonas\", \"Louise\",",
+              "  \"Thomas\", \"Anna\", \"Martin\", \"Katrine\", \"Mathias\", \"Cecilie\",",
+              "  \"Simon\", \"Laura\", \"Henrik\", \"Pernille\", \"Jesper\", \"Trine\",",
+              "  \"Casper\", \"Nanna\", \"Mads\", \"Sara\", \"Emil\", \"Signe\",",
+              "  \"Jakob\", \"Malene\", \"Daniel\", \"Josefine\"",
+              "];",
+              "const lastNames = [",
+              "  \"Jensen\", \"Nielsen\", \"Hansen\", \"Pedersen\", \"Andersen\",",
+              "  \"Christensen\", \"Larsen\", \"Sorensen\", \"Rasmussen\", \"Jorgensen\",",
+              "  \"Petersen\", \"Madsen\", \"Kristensen\", \"Olsen\", \"Thomsen\",",
+              "  \"Poulsen\", \"Johansen\", \"Moller\", \"Mortensen\", \"Knudsen\",",
+              "  \"Jakobsen\", \"Jacobsen\", \"Mikkelsen\", \"Frederiksen\", \"Laursen\",",
+              "  \"Henriksen\", \"Lund\", \"Holm\", \"Schmidt\", \"Vestergaard\"",
+              "];",
+              "const streets = [",
+              "  \"Norrebro gade\", \"Osterbrogade\", \"Vesterbrogade\", \"Amagerbrogade\",",
+              "  \"Frederiks Alle\", \"Jernbanegade\", \"Slotsgade\", \"Kirkegade\",",
+              "  \"Skovvej\", \"Strandvej\", \"Parkvej\", \"Stationsvej\",",
+              "  \"Mollevej\", \"Engvej\", \"Sondergade\", \"Vestergade\",",
+              "  \"Ostergade\", \"Nygade\", \"Hovedgaden\", \"Birkevej\"",
+              "];",
+              "const cities = [",
+              "  { city: \"Kobenhavn\", zip: \"1000\" },",
+              "  { city: \"Aarhus\", zip: \"8000\" },",
+              "  { city: \"Odense\", zip: \"5000\" },",
+              "  { city: \"Aalborg\", zip: \"9000\" },",
+              "  { city: \"Esbjerg\", zip: \"6700\" },",
+              "  { city: \"Roskilde\", zip: \"4000\" },",
+              "  { city: \"Vejle\", zip: \"7100\" },",
+              "  { city: \"Horsens\", zip: \"8700\" }",
+              "];",
+              "const birthYear = 65 + (index % 40);",
+              "const month = ((index * 7) % 12) + 1;",
+              "const day = ((index * 13) % 28) + 1;",
+              "const serial = 1000 + index;",
+              "const cpr = `${String(day).padStart(2, \"0\")}${String(month).padStart(2, \"0\")}${String(birthYear).padStart(2, \"0\")}${String(serial).slice(-4)}`;",
+              "const city = cities[(index - 1) % cities.length];",
+              "const houseNumber = ((index * 17) % 199) + 1;",
+              "",
+              "pm.variables.set(\"firstName\", firstNames[(index - 1) % firstNames.length]);",
+              "pm.variables.set(\"lastName\", lastNames[Math.floor((index - 1) / firstNames.length) % lastNames.length]);",
+              "pm.variables.set(\"cpr\", cpr);",
+              "pm.variables.set(\"streetAddress\", `${streets[(index - 1) % streets.length]} ${houseNumber}`);",
+              "pm.variables.set(\"city\", city.city);",
+              "pm.variables.set(\"zipCode\", city.zip);",
+              "pm.variables.set(\"bankAccountNumber\", `DK${String(10000000000000 + index)}`);"
+            ]
+          }
+        },
+        {
+          "listen": "test",
+          "script": {
+            "type": "text/javascript",
+            "exec": [
+              "pm.test(\"citizen seed response is acceptable\", () => {",
+              "  pm.expect(pm.response.code).to.be.oneOf([200, 201, 202, 409]);",
+              "});",
+              "",
+              "const index = Number(pm.collectionVariables.get(\"citizenIndex\"));",
+              "const target = Number(pm.collectionVariables.get(\"citizenTarget\"));",
+              "",
+              "if (index < target) {",
+              "  pm.collectionVariables.set(\"citizenIndex\", String(index + 1));",
+              "  pm.execution.setNextRequest(\"Seed Citizen\");",
+              "} else {",
+              "  console.log(`Seed complete: ${target} citizens and ${pm.collectionVariables.get(\"companyTarget\")} companies`);",
+              "  pm.execution.setNextRequest(null);",
+              "}"
+            ]
+          }
+        }
+      ],
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"firstName\": \"{{firstName}}\",\n  \"lastName\": \"{{lastName}}\",\n  \"cpr\": \"{{cpr}}\",\n  \"streetAddress\": \"{{streetAddress}}\",\n  \"city\": \"{{city}}\",\n  \"zipCode\": \"{{zipCode}}\",\n  \"bankAccountNumber\": \"{{bankAccountNumber}}\"\n}",
+          "options": {
+            "raw": {
+              "language": "json"
+            }
+          }
+        },
+        "url": {
+          "raw": "{{baseUrl}}/Citizen",
+          "host": [
+            "{{baseUrl}}"
+          ],
+          "path": [
+            "Citizen"
+          ]
+        }
+      },
+      "response": []
+    }
+  ],
+  "event": [],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "https://taxsystem.kvikit.dk",
+      "type": "string"
+    },
+    {
+      "key": "citizenTarget",
+      "value": "1000",
+      "type": "string"
+    },
+    {
+      "key": "companyTarget",
+      "value": "100",
+      "type": "string"
+    },
+    {
+      "key": "citizenIndex",
+      "value": "1",
+      "type": "string"
+    },
+    {
+      "key": "companyIndex",
+      "value": "1",
+      "type": "string"
+    }
+  ]
+}
