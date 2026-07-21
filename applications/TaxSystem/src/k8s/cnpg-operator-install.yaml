@@ -1,12 +1,18 @@
-# CloudNativePG Operator Installation via Flux
+# CloudNativePG Operator Installation
 #
-# This installs the CloudNativePG operator using Flux's HelmRelease.
-# The operator manages PostgreSQL Cluster CRDs cluster-wide.
+# The operator must be installed BEFORE applying postgres-cluster.yaml.
 #
-# If not using Flux, install manually:
+# For CI / manual install:
 #   kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.25/releases/cnpg-1.25.1.yaml
 #
+# For production (Flux GitOps), add a HelmRelease in your infrastructure repo:
+#   chart: cloudnative-pg from https://cloudnative-pg.github.io/charts
+#   namespace: cnpg-system
+#
 # Memory footprint: ~50MB for the operator controller pod.
+#
+# Verify installation:
+#   kubectl get deployment -n cnpg-system cnpg-controller-manager
 ---
 apiVersion: v1
 kind: Namespace
@@ -14,44 +20,3 @@ metadata:
   name: cnpg-system
   labels:
     app.kubernetes.io/name: cloudnative-pg
----
-apiVersion: source.toolkit.fluxcd.io/v1
-kind: HelmRepository
-metadata:
-  name: cnpg
-  namespace: flux-system
-spec:
-  interval: 24h
-  url: https://cloudnative-pg.github.io/charts
----
-apiVersion: helm.toolkit.fluxcd.io/v2
-kind: HelmRelease
-metadata:
-  name: cnpg-operator
-  namespace: cnpg-system
-spec:
-  interval: 12h
-  chart:
-    spec:
-      chart: cloudnative-pg
-      version: ">=0.23.0 <1.0.0"
-      sourceRef:
-        kind: HelmRepository
-        name: cnpg
-        namespace: flux-system
-  install:
-    crds: CreateReplace
-    remediation:
-      retries: 3
-  upgrade:
-    crds: CreateReplace
-    remediation:
-      retries: 3
-  values:
-    resources:
-      requests:
-        memory: "64Mi"
-        cpu: "50m"
-      limits:
-        memory: "128Mi"
-        cpu: "200m"
