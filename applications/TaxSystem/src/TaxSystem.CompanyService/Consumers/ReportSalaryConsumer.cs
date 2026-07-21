@@ -18,6 +18,7 @@ public class ReportSalaryConsumer : IConsumer<ReportSalary>
         var company = await _companyService.GetByCvrAsync(context.Message.Cvr);
         if (company is null)
         {
+            await context.RespondAsync(new CompanyInfoNotFound(context.Message.Cvr));
             return;
         }
 
@@ -29,5 +30,7 @@ public class ReportSalaryConsumer : IConsumer<ReportSalary>
             0m,
             0m,
             0m));
+
+        await context.RespondAsync(new SalaryReported(context.Message.Cpr, company.Name, (int)context.Message.Income));
     }
 }

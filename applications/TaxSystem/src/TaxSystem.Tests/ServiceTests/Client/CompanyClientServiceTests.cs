@@ -8,18 +8,14 @@ namespace TaxSystem.Tests.ServiceTests.Client;
 public class CompanyClientServiceTests
 {
     [Test]
-    public async Task SetEmployeeIncomeForYearPublishesReportSalary()
+    public async Task SetEmployeeIncomeForYearReturnsTrueWhenCompanyRespondsWithSalaryReported()
     {
-        var reportSalary = new TaskCompletionSource<ReportSalary>();
         await using var provider = BuildProvider(configurator =>
         {
             configurator.ReceiveEndpoint("report-salary-client-test", endpoint =>
             {
                 endpoint.Handler<ReportSalary>(context =>
-                {
-                    reportSalary.SetResult(context.Message);
-                    return Task.CompletedTask;
-                });
+                    context.RespondAsync(new SalaryReported(context.Message.Cpr, "Acme Corp", (int)context.Message.Income)));
             });
         });
         var bus = provider.GetRequiredService<IBusControl>();
@@ -29,11 +25,37 @@ public class CompanyClientServiceTests
         {
             using var scope = provider.CreateScope();
             var service = scope.ServiceProvider.GetRequiredService<CompanyClientService>();
-            await service.SetEmployeeIncomeForYear("12345678", 2026, 101011234, 100000);
+            var result = await service.SetEmployeeIncomeForYear("12345678", 2026, "101011234", 100000, null);
 
-            var message = await reportSalary.Task.WaitAsync(TimeSpan.FromSeconds(5));
+            Assert.That(result, Is.True);
+        }
+        finally
+        {
+            await bus.StopAsync();
+        }
+    }
 
-            Assert.That(message, Is.EqualTo(new ReportSalary("12345678", 2026, "101011234", 100000m)));
+    [Test]
+    public async Task SetEmployeeIncomeForYearReturnsFalseWhenCompanyIsNotFound()
+    {
+        await using var provider = BuildProvider(configurator =>
+        {
+            configurator.ReceiveEndpoint("report-salary-client-test", endpoint =>
+            {
+                endpoint.Handler<ReportSalary>(context =>
+                    context.RespondAsync(new CompanyInfoNotFound(context.Message.Cvr)));
+            });
+        });
+        var bus = provider.GetRequiredService<IBusControl>();
+
+        await bus.StartAsync();
+        try
+        {
+            using var scope = provider.CreateScope();
+            var service = scope.ServiceProvider.GetRequiredService<CompanyClientService>();
+            var result = await service.SetEmployeeIncomeForYear("99999999", 2026, "101011234", 100000, null);
+
+            Assert.That(result, Is.False);
         }
         finally
         {
@@ -50,6 +72,7 @@ public class CompanyClientServiceTests
             busRegistrationConfigurator.AddRequestClient<CompanyRegistrationRequested>();
             busRegistrationConfigurator.AddRequestClient<CompanyDeregistrationRequested>();
             busRegistrationConfigurator.AddRequestClient<CompanyInfoRequested>();
+            busRegistrationConfigurator.AddRequestClient<ReportSalary>();
             busRegistrationConfigurator.UsingInMemory((_, configurator) => configure(configurator));
         });
 

@@ -40,28 +40,29 @@ public class CitizenController : ControllerBase
         }
     }
 
-    [HttpPost("{citizenId}/income/{year}")]
-    public async Task<IActionResult> ReportIncome(int citizenId, int year, [FromBody] int income)
-    {
-        if (citizenId <= 0 || year <= 0 || income < 0)
-        {
-            return BadRequest("Citizen ID, year, and income must be valid.");
-        }
-
-        try
-        {
-            await _citizenClientService.ReportIncome(citizenId, year, income);
-            return Ok("Income reported successfully.");
-        }
-        catch (NotImplementedException)
-        {
-            return StatusCode(StatusCodes.Status501NotImplemented, "Income reporting is not implemented yet.");
-        }
-        catch (Exception)
-        {
-            return StatusCode(StatusCodes.Status500InternalServerError, "Failed to report income.");
-        }
-    }
+    // DEPRECIATED -- ONLY COMPANIES CAN REPORT INCOME FOR THEIR EMPLOYEES
+    // [HttpPost("{citizenId}/income/{year}")] 
+    // public async Task<IActionResult> ReportIncome(int citizenId, int year, [FromBody] int income)
+    // {
+    //     if (citizenId <= 0 || year <= 0 || income < 0)
+    //     {
+    //         return BadRequest("Citizen ID, year, and income must be valid.");
+    //     }
+    //
+    //     try
+    //     {
+    //         await _citizenClientService.ReportIncome(citizenId, year, income);
+    //         return Ok("Income reported successfully.");
+    //     }
+    //     catch (NotImplementedException)
+    //     {
+    //         return StatusCode(StatusCodes.Status501NotImplemented, "Income reporting is not implemented yet.");
+    //     }
+    //     catch (Exception)
+    //     {
+    //         return StatusCode(StatusCodes.Status500InternalServerError, "Failed to report income.");
+    //     }
+    // }
 
     [HttpPost("{citizenId}/deductibles/{year}")]
     public IActionResult ReportDeductible(int citizenId, int year, [FromBody] List<Deductible> deductibles)
