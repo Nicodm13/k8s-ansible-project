@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: statementgenerator-service
-          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-statementgenerator-service:a1dfce8f912afda1a2be9624fab531c4dee70290
+          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-statementgenerator-service:10284d03bd1e9a9fa545df57dd598edce658ba93
           imagePullPolicy: IfNotPresent
           env:
             - name: TAXSYSTEM_DATA_PATH
