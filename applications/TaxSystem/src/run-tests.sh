@@ -180,9 +180,26 @@ kubectl delete cluster taxsystem-db -n taxsystem --ignore-not-found --wait=true 
 echo "  Waiting for old database pods to terminate..."
 kubectl wait --for=delete pod -l cnpg.io/cluster=taxsystem-db -n taxsystem --timeout=60s 2>/dev/null || true
 
-# Install CloudNativePG operator (idempotent)
-echo "  Installing CloudNativePG operator..."
-kubectl apply --server-side -f https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/release-1.25/releases/cnpg-1.25.1.yaml 2>/dev/null
+# Install CloudNativePG operator with the same Helm chart used by Flux.
+echo "  Installing CloudNativePG Helm chart..."
+helm repo add cnpg https://cloudnative-pg.github.io/charts >/dev/null 2>&1 || true
+helm repo update cnpg >/dev/null
+if ! helm upgrade --install cnpg-operator cnpg/cloudnative-pg \
+  --namespace cnpg-system \
+  --create-namespace \
+  --version '>=0.23.0 <1.0.0' \
+  --set resources.requests.memory=64Mi \
+  --set resources.requests.cpu=50m \
+  --set resources.limits.memory=128Mi \
+  --set resources.limits.cpu=200m \
+  --wait \
+  --timeout 120s; then
+  echo "✗ CloudNativePG Helm install failed"
+  kubectl get pods,deployments -n cnpg-system
+  kubectl describe deployment cnpg-controller-manager -n cnpg-system 2>&1 || true
+  kubectl logs deployment/cnpg-controller-manager -n cnpg-system --tail=100 2>&1 || true
+  exit 1
+fi
 kubectl wait --for=condition=Available deployment/cnpg-controller-manager -n cnpg-system --timeout=60s
 if [ $? -ne 0 ]; then echo "✗ CloudNativePG operator not ready"; exit 1; fi
 echo "  ✓ CloudNativePG operator ready."
@@ -240,6 +257,7 @@ fi
 echo "  ✓ PostgreSQL cluster ready."
 
 # Apply root manifests with Minikube-local images.
+TAXSYSTEM_RENDERED_MANIFEST="$TMP_MANIFEST_DIR/taxsystem.yaml"
 kubectl kustomize "$TAXSYSTEM_MANIFEST_DIR" \
   | sed \
       -e 's#image: ghcr.io/.*/taxsystem-client:.*#image: taxsystem-client:latest#' \
@@ -248,9 +266,17 @@ kubectl kustomize "$TAXSYSTEM_MANIFEST_DIR" \
       -e 's#image: ghcr.io/.*/taxsystem-bank-service:.*#image: taxsystem-bank-service:latest#' \
       -e 's#image: ghcr.io/.*/taxsystem-statementgenerator-service:.*#image: taxsystem-statementgenerator-service:latest#' \
       -e 's/imagePullPolicy: IfNotPresent/imagePullPolicy: Never/g' \
-  > "$TMP_MANIFEST_DIR/taxsystem.yaml"
+  > "$TAXSYSTEM_RENDERED_MANIFEST"
 
-kubectl apply -f "$TMP_MANIFEST_DIR/taxsystem.yaml"
+echo "  TaxSystem deployment images:"
+grep -E '^ *image: ' "$TAXSYSTEM_RENDERED_MANIFEST" | sed 's/^/    /'
+
+if grep -E 'image: ghcr.io/.*/taxsystem-(client|citizen-service|company-service|bank-service|statementgenerator-service):' "$TAXSYSTEM_RENDERED_MANIFEST" >/dev/null; then
+  echo "✗ Rendered TaxSystem manifests still reference production GHCR images"
+  exit 1
+fi
+
+kubectl apply -f "$TAXSYSTEM_RENDERED_MANIFEST"
 kubectl patch service client -n taxsystem --type merge -p '{"spec":{"type":"NodePort"}}'
 echo "✓ Manifests applied."
 
