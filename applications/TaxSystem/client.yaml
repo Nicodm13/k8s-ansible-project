@@ -17,7 +17,7 @@ spec:
     spec:
       containers:
         - name: client
-          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-client:54555ce6fad127e7d0e0f49bf400d23cefde30c1
+          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-client:9d62b5d229249809a432ee3168a9a2ca63846c6f
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
