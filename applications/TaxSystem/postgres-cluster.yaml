@@ -45,6 +45,13 @@ spec:
       memory: "256Mi"
       cpu: "500m"
 
+  # Force primary and replica onto different nodes (hard requirement) —
+  # the operator's default anti-affinity is only "preferred" and was
+  # observed to let both instances land on the same node.
+  affinity:
+    podAntiAffinityType: required
+    topologyKey: kubernetes.io/hostname
+
   # Persistent storage per instance
   storage:
     size: 2Gi
