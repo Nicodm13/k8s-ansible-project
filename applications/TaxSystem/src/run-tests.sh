@@ -301,10 +301,14 @@ fi
 echo "  ✓ PostgreSQL cluster ready."
 
 # Apply root manifests with Minikube-local images.
-# Also relax the hard topologySpreadConstraints/anti-affinity added for the
-# real 2-worker Azure cluster: a single-node Minikube cluster can never
-# satisfy `whenUnsatisfiable: DoNotSchedule` (2 replicas, 1 node) or CNPG's
-# `podAntiAffinityType: required` - pods/the DB would sit Pending forever.
+# Also relax CNPG's hard anti-affinity added for the real 2-worker Azure
+# cluster: `podAntiAffinityType: required` would leave the second DB instance
+# Pending forever on a single-node cluster. Note: topologySpreadConstraints
+# need no such override here - their skew is always 0 with only one topology
+# domain, so `whenUnsatisfiable: DoNotSchedule` never blocks scheduling on a
+# single node (and rewriting it to match the other constraint's
+# `ScheduleAnyway` would create an invalid duplicate {topologyKey,
+# whenUnsatisfiable} pair, which the API rejects).
 TAXSYSTEM_RENDERED_MANIFEST="$TMP_MANIFEST_DIR/taxsystem.yaml"
 kubectl kustomize "$TAXSYSTEM_MANIFEST_DIR" \
   | sed \
@@ -314,7 +318,6 @@ kubectl kustomize "$TAXSYSTEM_MANIFEST_DIR" \
       -e 's#image: ghcr.io/.*/taxsystem-bank-service:.*#image: taxsystem-bank-service:latest#' \
       -e 's#image: ghcr.io/.*/taxsystem-statementgenerator-service:.*#image: taxsystem-statementgenerator-service:latest#' \
       -e 's/imagePullPolicy: IfNotPresent/imagePullPolicy: Never/g' \
-      -e 's/whenUnsatisfiable: DoNotSchedule/whenUnsatisfiable: ScheduleAnyway/g' \
       -e 's/podAntiAffinityType: required/podAntiAffinityType: preferred/' \
   > "$TAXSYSTEM_RENDERED_MANIFEST"
 
