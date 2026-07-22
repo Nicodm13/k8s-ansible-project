@@ -14,6 +14,7 @@ spec:
     metadata:
       labels:
         app: client
+        workload-tier: taxsystem-app
     spec:
       topologySpreadConstraints:
         - maxSkew: 1
@@ -21,13 +22,20 @@ spec:
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
-              app: client
+              workload-tier: taxsystem-app
       containers:
         - name: client
           image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-client:6c8c5c027d0dc8276a56e22a3a22edfa013dbdad
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 250m
+              memory: 256Mi
           env:
             - name: ASPNETCORE_URLS
               value: "http://+:8080"

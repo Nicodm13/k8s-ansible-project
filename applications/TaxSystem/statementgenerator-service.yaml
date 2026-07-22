@@ -14,11 +14,26 @@ spec:
     metadata:
       labels:
         app: statementgenerator-service
+        workload-tier: taxsystem-app
     spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              workload-tier: taxsystem-app
       containers:
         - name: statementgenerator-service
           image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-statementgenerator-service:6c8c5c027d0dc8276a56e22a3a22edfa013dbdad
           imagePullPolicy: IfNotPresent
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 500Mi
           env:
             - name: TAXSYSTEM_DATA_PATH
               value: "/var/lib/taxsystem"
