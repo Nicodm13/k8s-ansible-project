@@ -1,0 +1,54 @@
+# Restricts RabbitMQ and the CNPG Postgres cluster so that only pods within the
+# taxsystem namespace (the app services themselves) can reach them.
+# The CNPG operator (cnpg-system namespace) also needs direct access to each
+# Postgres instance for health checks and orchestration (instance manager API).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: rabbitmq-restrict-ingress
+  namespace: taxsystem
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: rabbitmq
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: taxsystem
+      ports:
+        - protocol: TCP
+          port: 5672
+        - protocol: TCP
+          port: 15672
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: taxsystem-db-restrict-ingress
+  namespace: taxsystem
+spec:
+  podSelector:
+    matchLabels:
+      cnpg.io/cluster: taxsystem-db
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: taxsystem
+      ports:
+        - protocol: TCP
+          port: 5432
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: cnpg-system
+      ports:
+        - protocol: TCP
+          port: 5432
+        - protocol: TCP
+          port: 8000
