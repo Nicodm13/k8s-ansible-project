@@ -284,7 +284,12 @@ kubectl apply -f "$TAXSYSTEM_MANIFEST_DIR/postgres-credentials.yaml"
 echo "  Pre-pulling CloudNativePG PostgreSQL image..."
 docker pull ghcr.io/cloudnative-pg/postgresql:16.4 || true
 echo "  Deploying PostgreSQL cluster..."
-kubectl apply -f "$TAXSYSTEM_MANIFEST_DIR/postgres-cluster.yaml"
+# Minikube here is a single node, so the hard `podAntiAffinityType: required`
+# (added for the real 2-worker Azure cluster) would leave the second CNPG
+# instance Pending forever. Relax it to "preferred" for this local/CI run only
+# - the manifest on disk (and what Flux applies in production) is untouched.
+sed -e 's/podAntiAffinityType: required/podAntiAffinityType: preferred/' \
+  "$TAXSYSTEM_MANIFEST_DIR/postgres-cluster.yaml" | kubectl apply -f -
 echo "  Waiting for PostgreSQL cluster to be ready (up to 60s)..."
 kubectl wait --for=condition=Ready cluster/taxsystem-db -n taxsystem --timeout=60s
 if [ $? -ne 0 ]; then
@@ -296,6 +301,14 @@ fi
 echo "  ✓ PostgreSQL cluster ready."
 
 # Apply root manifests with Minikube-local images.
+# Also relax CNPG's hard anti-affinity added for the real 2-worker Azure
+# cluster: `podAntiAffinityType: required` would leave the second DB instance
+# Pending forever on a single-node cluster. Note: topologySpreadConstraints
+# need no such override here - their skew is always 0 with only one topology
+# domain, so `whenUnsatisfiable: DoNotSchedule` never blocks scheduling on a
+# single node (and rewriting it to match the other constraint's
+# `ScheduleAnyway` would create an invalid duplicate {topologyKey,
+# whenUnsatisfiable} pair, which the API rejects).
 TAXSYSTEM_RENDERED_MANIFEST="$TMP_MANIFEST_DIR/taxsystem.yaml"
 kubectl kustomize "$TAXSYSTEM_MANIFEST_DIR" \
   | sed \
@@ -305,6 +318,7 @@ kubectl kustomize "$TAXSYSTEM_MANIFEST_DIR" \
       -e 's#image: ghcr.io/.*/taxsystem-bank-service:.*#image: taxsystem-bank-service:latest#' \
       -e 's#image: ghcr.io/.*/taxsystem-statementgenerator-service:.*#image: taxsystem-statementgenerator-service:latest#' \
       -e 's/imagePullPolicy: IfNotPresent/imagePullPolicy: Never/g' \
+      -e 's/podAntiAffinityType: required/podAntiAffinityType: preferred/' \
   > "$TAXSYSTEM_RENDERED_MANIFEST"
 
 echo "  TaxSystem deployment images:"
