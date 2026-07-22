@@ -10,3 +10,4 @@ resources:
   - bank-service.yaml
   - statementgenerator-service.yaml
   - ingress.yaml
+  - network-policies.yaml
