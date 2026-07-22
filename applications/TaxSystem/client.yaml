@@ -31,7 +31,7 @@ spec:
               workload-tier: taxsystem-app
       containers:
         - name: client
-          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-client:5e5067e1a3083434fea210b90e967a600f6ef650
+          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-client:fab71276f0b907e70c2bd669fcd43e2ad35602c4
           imagePullPolicy: IfNotPresent
           ports:
             - containerPort: 8080
