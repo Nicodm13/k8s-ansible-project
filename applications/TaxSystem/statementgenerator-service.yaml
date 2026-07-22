@@ -33,7 +33,7 @@ spec:
               memory: 128Mi
             limits:
               cpu: 500m
-              memory: 500Mi
+              memory: 800Mi
           env:
             - name: TAXSYSTEM_DATA_PATH
               value: "/var/lib/taxsystem"
