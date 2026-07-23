@@ -7,7 +7,6 @@ metadata:
     app: citizen-service
 spec:
   serviceName: citizen-service-headless
-  podManagementPolicy: Parallel
   replicas: 2
   selector:
     matchLabels:

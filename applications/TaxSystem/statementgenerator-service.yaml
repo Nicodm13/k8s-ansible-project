@@ -7,7 +7,6 @@ metadata:
     app: statementgenerator-service
 spec:
   serviceName: statementgenerator-service-headless
-  podManagementPolicy: Parallel
   replicas: 2
   selector:
     matchLabels:

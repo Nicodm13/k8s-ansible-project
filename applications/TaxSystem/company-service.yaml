@@ -7,7 +7,6 @@ metadata:
     app: company-service
 spec:
   serviceName: company-service-headless
-  podManagementPolicy: Parallel
   replicas: 2
   selector:
     matchLabels:
