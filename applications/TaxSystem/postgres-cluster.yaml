@@ -37,10 +37,14 @@ spec:
       synchronous_commit: "on"
 
   # Resource limits per instance
+  # NOTE: cpu request intentionally lowered from 100m to 50m (2026-07-22) -
+  # worker nodes are at ~94% CPU request allocation already, and the extra
+  # ~50m headroom was needed to let the second (anti-affine) instance
+  # schedule at all. Limit is unchanged so Postgres can still burst under load.
   resources:
     requests:
       memory: "128Mi"
-      cpu: "100m"
+      cpu: "50m"
     limits:
       memory: "256Mi"
       cpu: "500m"
