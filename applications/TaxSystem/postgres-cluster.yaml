@@ -47,7 +47,7 @@ spec:
       cpu: "50m"
     limits:
       memory: "256Mi"
-      cpu: "500m"
+      cpu: "1000m"
 
   # Force primary and replica onto different nodes (hard requirement) —
   # the operator's default anti-affinity is only "preferred" and was
