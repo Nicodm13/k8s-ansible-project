@@ -7,7 +7,6 @@ metadata:
     app: bank-service
 spec:
   serviceName: bank-service-headless
-  podManagementPolicy: Parallel
   replicas: 2
   selector:
     matchLabels:
