@@ -19,12 +19,14 @@ spec:
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
+          nodeTaintsPolicy: Honor
           whenUnsatisfiable: DoNotSchedule
           labelSelector:
             matchLabels:
               app: client
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
+          nodeTaintsPolicy: Honor
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
