@@ -31,7 +31,7 @@ spec:
               workload-tier: taxsystem-app
       containers:
         - name: citizen-service
-          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-citizen-service:fab71276f0b907e70c2bd669fcd43e2ad35602c4
+          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-citizen-service:b1a5839277780329e601cceccd4a06b23b6fa765
           imagePullPolicy: IfNotPresent
           resources:
             requests:
