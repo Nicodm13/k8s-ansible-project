@@ -41,10 +41,10 @@ Each service creates its tables on startup with Entity Framework `EnsureCreated`
 Manifests in this directory are the production/GitOps source of truth.
 
 - `client.yaml`: client Deployment and Service.
-- `citizen-service.yaml`: CitizenService StatefulSet and Services.
-- `company-service.yaml`: CompanyService StatefulSet and Services.
-- `bank-service.yaml`: BankService StatefulSet and Services.
-- `statementgenerator-service.yaml`: StatementGeneratorService StatefulSet and Services.
+- `citizen-service.yaml`: CitizenService Deployment and Service.
+- `company-service.yaml`: CompanyService Deployment and Service.
+- `bank-service.yaml`: BankService Deployment and Service.
+- `statementgenerator-service.yaml`: StatementGeneratorService Deployment and Service.
 - `postgres-cluster.yaml`: CloudNativePG PostgreSQL cluster.
 - `postgres-credentials.yaml`: Kubernetes secrets for PostgreSQL credentials and connection strings.
 - `network-policies.yaml`: RabbitMQ and PostgreSQL ingress restrictions.
@@ -104,6 +104,6 @@ flux reconcile kustomization applications -n flux-system --with-source
 Check the deployed application:
 
 ```bash
-kubectl -n taxsystem get deployments,statefulsets,pods,svc,ingress
+kubectl -n taxsystem get deployments,pods,svc,ingress
 kubectl -n taxsystem get cluster taxsystem-db
 ```

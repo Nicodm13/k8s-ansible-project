@@ -1,12 +1,11 @@
 apiVersion: apps/v1
-kind: StatefulSet
+kind: Deployment
 metadata:
   name: citizen-service
   namespace: taxsystem
   labels:
     app: citizen-service
 spec:
-  serviceName: citizen-service-headless
   replicas: 2
   selector:
     matchLabels:
@@ -43,8 +42,6 @@ spec:
             limits:
               memory: 600Mi
           env:
-            - name: TAXSYSTEM_DATA_PATH
-              value: "/var/lib/taxsystem"
             - name: TAXSYSTEM_DB_CONNECTION_WRITE
               valueFrom:
                 secretKeyRef:
@@ -66,17 +63,6 @@ spec:
                 secretKeyRef:
                   name: rabbitmq
                   key: rabbitmq-password
-          volumeMounts:
-            - name: data
-              mountPath: /var/lib/taxsystem
-  volumeClaimTemplates:
-    - metadata:
-        name: data
-      spec:
-        accessModes: ["ReadWriteOnce"]
-        resources:
-          requests:
-            storage: 1Gi
 ---
 apiVersion: v1
 kind: Service
@@ -84,19 +70,6 @@ metadata:
   name: citizen-service
   namespace: taxsystem
 spec:
-  selector:
-    app: citizen-service
-  ports:
-    - port: 80
-      targetPort: 8080
----
-apiVersion: v1
-kind: Service
-metadata:
-  name: citizen-service-headless
-  namespace: taxsystem
-spec:
-  clusterIP: None
   selector:
     app: citizen-service
   ports:

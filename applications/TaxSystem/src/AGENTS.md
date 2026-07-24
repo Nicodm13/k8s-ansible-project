@@ -18,7 +18,7 @@ Services communicate through typed MassTransit contracts over RabbitMQ. Service 
 Production/GitOps manifests live one directory above this source tree in `applications/TaxSystem/`.
 
 - `client` is a Kubernetes `Deployment`.
-- `citizen-service`, `company-service`, `bank-service`, and `statementgenerator-service` are Kubernetes `StatefulSet` workloads.
+- `citizen-service`, `company-service`, `bank-service`, and `statementgenerator-service` are Kubernetes `Deployment` workloads.
 - RabbitMQ is installed by the Flux-managed HelmRelease under `infrastructure/messaging/rabbitmq`.
 - PostgreSQL is managed by the CloudNativePG `Cluster` named `taxsystem-db`.
 - Traefik exposes the client through `taxsystem.kvikit.dk`.
@@ -154,7 +154,7 @@ Do not assume the Dockerfiles perform a full SDK build inside the image. They co
 
 ## Common Pitfalls
 
-1. Do not change Kubernetes StatefulSet immutable fields casually. Existing StatefulSets may need explicit recreation if fields outside the allowed update set change.
+1. Use Deployments for stateless app services. Only use StatefulSets when stable pod identity or per-replica storage is required.
 2. Do not use localhost for service-to-service communication inside Kubernetes. Use Kubernetes service names.
 3. Do not hardcode RabbitMQ or PostgreSQL credentials in C# code or appsettings files.
 4. Keep Reqnroll step regexes aligned with the exact feature-file text.

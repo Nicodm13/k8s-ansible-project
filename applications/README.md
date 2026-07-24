@@ -68,10 +68,10 @@ TaxSystem is deployed from `applications/TaxSystem`.
 The current workload layout is:
 
 - `client`: Deployment, exposed through `taxsystem.kvikit.dk`.
-- `citizen-service`: StatefulSet with per-replica persistent storage.
-- `company-service`: StatefulSet with per-replica persistent storage.
-- `bank-service`: StatefulSet with per-replica persistent storage.
-- `statementgenerator-service`: StatefulSet with per-replica persistent storage.
+- `citizen-service`: Deployment.
+- `company-service`: Deployment.
+- `bank-service`: Deployment.
+- `statementgenerator-service`: Deployment.
 - `taxsystem-db`: CloudNativePG PostgreSQL cluster.
 - `rabbitmq`: Helm-managed RabbitMQ release from `infrastructure/messaging`.
 
@@ -99,7 +99,7 @@ kubectl -n taxsystem delete cluster taxsystem-db
 kubectl -n taxsystem delete pvc -l cnpg.io/cluster=taxsystem-db
 flux reconcile kustomization applications -n flux-system --with-source
 kubectl -n taxsystem wait --for=condition=Ready cluster/taxsystem-db --timeout=180s
-kubectl -n taxsystem rollout restart statefulset/citizen-service statefulset/company-service statefulset/bank-service statefulset/statementgenerator-service deployment/client
+kubectl -n taxsystem rollout restart deployment/citizen-service deployment/company-service deployment/bank-service deployment/statementgenerator-service deployment/client
 ```
 
 The service restart is required. The reset creates empty databases, and each service creates its own tables during startup with Entity Framework `EnsureCreated`. If the services are not restarted after the new CNPG cluster is ready, requests can fail with PostgreSQL errors such as `relation "companies" does not exist` or `relation "citizens" does not exist`.
@@ -107,10 +107,10 @@ The service restart is required. The reset creates empty databases, and each ser
 Wait for the restarted services before seeding data:
 
 ```bash
-kubectl -n taxsystem rollout status statefulset/citizen-service
-kubectl -n taxsystem rollout status statefulset/company-service
-kubectl -n taxsystem rollout status statefulset/bank-service
-kubectl -n taxsystem rollout status statefulset/statementgenerator-service
+kubectl -n taxsystem rollout status deployment/citizen-service
+kubectl -n taxsystem rollout status deployment/company-service
+kubectl -n taxsystem rollout status deployment/bank-service
+kubectl -n taxsystem rollout status deployment/statementgenerator-service
 kubectl -n taxsystem rollout status deployment/client
 ```
 
@@ -119,5 +119,5 @@ Verify:
 ```bash
 kubectl -n taxsystem get cluster taxsystem-db
 kubectl -n taxsystem get pods -l cnpg.io/cluster=taxsystem-db
-kubectl -n taxsystem get deployments,statefulsets,svc,ingress
+kubectl -n taxsystem get deployments,svc,ingress
 ```
