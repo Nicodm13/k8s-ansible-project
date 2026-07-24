@@ -35,7 +35,7 @@ spec:
               workload-tier: taxsystem-app
       containers:
         - name: company-service
-          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-company-service:d4340e01a927074531a6f353904c18fe360f13b1
+          image: ghcr.io/nicodm13/k8s-ansible-project/taxsystem-company-service:b163d447a102484c5d903779c0e6ae29747698d1
           imagePullPolicy: IfNotPresent
           resources:
             requests:
