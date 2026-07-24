@@ -3,6 +3,7 @@ using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.DependencyInjection;
 using TaxSystem.Shared.Messaging.Contracts;
+using TaxSystem.Shared.Persistance;
 using TaxSystem.StatementGenerator.Consumers;
 using TaxSystem.StatementGenerator.Persistance;
 using TaxSystem.StatementGenerator.Repositories;
@@ -282,10 +283,14 @@ public class StatementGeneratorServiceMessageFlowTests
         bool includeReportDeductiblesConsumer = false)
     {
         var services = new ServiceCollection();
+        var dbContextOptions = new DbContextOptionsBuilder<StatementDbContext>()
+            .UseSqlite(_sqliteConnection)
+            .Options;
         services.AddDbContext<StatementDbContext>(options =>
         {
             options.UseSqlite(_sqliteConnection);
         });
+        services.AddSingleton<IReadDbContextFactory<StatementDbContext>>(new TestReadDbContextFactory<StatementDbContext>(dbContextOptions));
         services.AddScoped<IReadStatementRepository, StatementPostgresRepository>();
         services.AddScoped<IWriteStatementRepository, StatementPostgresRepository>();
         services.AddScoped<BackendStatementGeneratorService>();

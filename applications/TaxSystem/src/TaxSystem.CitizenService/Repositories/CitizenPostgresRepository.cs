@@ -1,46 +1,52 @@
 using Microsoft.EntityFrameworkCore;
 using TaxSystem.CitizenService.Persistance;
 using TaxSystem.Shared.Models;
+using TaxSystem.Shared.Persistance;
 
 namespace TaxSystem.CitizenService.Repositories;
 
 public class CitizenPostgresRepository : IReadCitizenRepository, IWriteCitizenRepository
 {
-    private readonly CitizenDbContext _dbContext;
+    private readonly CitizenDbContext _writeDbContext;
+    private readonly IReadDbContextFactory<CitizenDbContext> _readDbContextFactory;
 
-    public CitizenPostgresRepository(CitizenDbContext dbContext)
+    public CitizenPostgresRepository(
+        CitizenDbContext writeDbContext,
+        IReadDbContextFactory<CitizenDbContext> readDbContextFactory)
     {
-        _dbContext = dbContext;
+        _writeDbContext = writeDbContext;
+        _readDbContextFactory = readDbContextFactory;
     }
 
     public async Task<Citizen?> GetByCprAsync(string cpr)
     {
-        return await _dbContext.Citizens.FindAsync(cpr);
+        await using var readDbContext = _readDbContextFactory.CreateDbContext();
+        return await readDbContext.Citizens.AsNoTracking().FirstOrDefaultAsync(c => c.cpr == cpr);
     }
 
     public async Task SaveAsync(Citizen citizen)
     {
-        var existing = await _dbContext.Citizens.FindAsync(citizen.cpr);
+        var existing = await _writeDbContext.Citizens.FindAsync(citizen.cpr);
         if (existing is null)
         {
-            _dbContext.Citizens.Add(citizen);
+            _writeDbContext.Citizens.Add(citizen);
         }
         else
         {
-            _dbContext.Entry(existing).CurrentValues.SetValues(citizen);
+            _writeDbContext.Entry(existing).CurrentValues.SetValues(citizen);
         }
 
-        await _dbContext.SaveChangesAsync();
+        await _writeDbContext.SaveChangesAsync();
     }
 
     public async Task<bool> DeleteAsync(string cpr)
     {
-        var citizen = await _dbContext.Citizens.FindAsync(cpr);
+        var citizen = await _writeDbContext.Citizens.FindAsync(cpr);
         if (citizen is null)
             return false;
 
-        _dbContext.Citizens.Remove(citizen);
-        await _dbContext.SaveChangesAsync();
+        _writeDbContext.Citizens.Remove(citizen);
+        await _writeDbContext.SaveChangesAsync();
         return true;
     }
 }

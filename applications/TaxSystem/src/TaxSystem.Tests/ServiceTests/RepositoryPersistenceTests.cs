@@ -7,6 +7,7 @@ using TaxSystem.CitizenService.Repositories;
 using TaxSystem.CompanyService.Persistance;
 using TaxSystem.CompanyService.Repositories;
 using TaxSystem.Shared.Models;
+using TaxSystem.Shared.Persistance;
 using TaxSystem.StatementGenerator.Persistance;
 using TaxSystem.StatementGenerator.Repositories;
 
@@ -39,7 +40,7 @@ public class RepositoryPersistenceTests
         await using var dbContext = new CitizenDbContext(options);
         await dbContext.Database.EnsureCreatedAsync();
 
-        var repository = new CitizenPostgresRepository(dbContext);
+        var repository = new CitizenPostgresRepository(dbContext, new TestReadDbContextFactory<CitizenDbContext>(options));
         IReadCitizenRepository readRepository = repository;
         IWriteCitizenRepository writeRepository = repository;
         var citizen = new Citizen
@@ -70,7 +71,7 @@ public class RepositoryPersistenceTests
         await using var dbContext = new CompanyDbContext(options);
         await dbContext.Database.EnsureCreatedAsync();
 
-        var repository = new CompanyPostgresRepository(dbContext);
+        var repository = new CompanyPostgresRepository(dbContext, new TestReadDbContextFactory<CompanyDbContext>(options));
         IReadCompanyRepository readRepository = repository;
         IWriteCompanyRepository writeRepository = repository;
         var company = new Company
@@ -97,7 +98,7 @@ public class RepositoryPersistenceTests
         await using var dbContext = new BankDbContext(options);
         await dbContext.Database.EnsureCreatedAsync();
 
-        var repository = new BankPostgresRepository(dbContext);
+        var repository = new BankPostgresRepository(dbContext, new TestReadDbContextFactory<BankDbContext>(options));
         IBankReadRepository readRepository = repository;
         IBankWriteRepository writeRepository = repository;
         var transfer = new BankTransfer(
@@ -123,7 +124,7 @@ public class RepositoryPersistenceTests
         await using var dbContext = new StatementDbContext(options);
         await dbContext.Database.EnsureCreatedAsync();
 
-        var repository = new StatementPostgresRepository(dbContext);
+        var repository = new StatementPostgresRepository(dbContext, new TestReadDbContextFactory<StatementDbContext>(options));
         IReadStatementRepository readRepository = repository;
         IWriteStatementRepository writeRepository = repository;
         var cpr = "0101011234";
@@ -146,4 +147,5 @@ public class RepositoryPersistenceTests
         Assert.That(persistedStatement!.annualGrossSalary, Is.EqualTo(statement.annualGrossSalary));
         Assert.That(persistedStatement.annualOwedTax, Is.EqualTo(statement.annualOwedTax));
     }
+
 }

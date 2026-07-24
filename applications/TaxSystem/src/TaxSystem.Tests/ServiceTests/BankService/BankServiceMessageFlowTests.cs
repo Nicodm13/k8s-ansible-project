@@ -6,6 +6,7 @@ using TaxSystem.BankService.Consumers;
 using TaxSystem.BankService.Persistance;
 using TaxSystem.BankService.Repositories;
 using TaxSystem.Shared.Messaging.Contracts;
+using TaxSystem.Shared.Persistance;
 using BackendBankService = TaxSystem.BankService.Services.BankService;
 
 namespace TaxSystem.Tests.ServiceTests.BankService;
@@ -127,10 +128,14 @@ public class BankServiceMessageFlowTests
     private ServiceProvider BuildProvider(Action<IInMemoryBusFactoryConfigurator> configure)
     {
         var services = new ServiceCollection();
+        var dbContextOptions = new DbContextOptionsBuilder<BankDbContext>()
+            .UseSqlite(_sqliteConnection)
+            .Options;
         services.AddDbContext<BankDbContext>(options =>
         {
             options.UseSqlite(_sqliteConnection);
         });
+        services.AddSingleton<IReadDbContextFactory<BankDbContext>>(new TestReadDbContextFactory<BankDbContext>(dbContextOptions));
         services.AddScoped<IBankReadRepository, BankPostgresRepository>();
         services.AddScoped<IBankWriteRepository, BankPostgresRepository>();
         services.AddScoped<BackendBankService>();

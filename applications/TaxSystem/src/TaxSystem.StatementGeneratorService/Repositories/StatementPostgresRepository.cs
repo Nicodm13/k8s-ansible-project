@@ -1,29 +1,35 @@
 using Microsoft.EntityFrameworkCore;
 using TaxSystem.Shared.Models;
+using TaxSystem.Shared.Persistance;
 using TaxSystem.StatementGenerator.Persistance;
 
 namespace TaxSystem.StatementGenerator.Repositories;
 
 public class StatementPostgresRepository : IReadStatementRepository, IWriteStatementRepository
 {
-    private readonly StatementDbContext _dbContext;
+    private readonly StatementDbContext _writeDbContext;
+    private readonly IReadDbContextFactory<StatementDbContext> _readDbContextFactory;
 
-    public StatementPostgresRepository(StatementDbContext dbContext)
+    public StatementPostgresRepository(
+        StatementDbContext writeDbContext,
+        IReadDbContextFactory<StatementDbContext> readDbContextFactory)
     {
-        _dbContext = dbContext;
+        _writeDbContext = writeDbContext;
+        _readDbContextFactory = readDbContextFactory;
     }
 
     public async Task SaveReportAsync(string cpr, Statement statement)
     {
         statement.reportId ??= Guid.NewGuid().ToString("N");
         statement.cpr = cpr;
-        _dbContext.Statements.Add(statement);
-        await _dbContext.SaveChangesAsync();
+        _writeDbContext.Statements.Add(statement);
+        await _writeDbContext.SaveChangesAsync();
     }
 
     public async Task<Statement?> GetMergedStatementAsync(string cpr)
     {
-        var reports = await _dbContext.Statements
+        await using var readDbContext = _readDbContextFactory.CreateDbContext();
+        var reports = await readDbContext.Statements
             .Where(s => s.cpr == cpr)
             .OrderByDescending(s => s.reportedAt)
             .AsNoTracking()

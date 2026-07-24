@@ -1,30 +1,36 @@
 using Microsoft.EntityFrameworkCore;
 using TaxSystem.BankService.Persistance;
 using TaxSystem.Shared.Models;
+using TaxSystem.Shared.Persistance;
 
 namespace TaxSystem.BankService.Repositories;
 
 public class BankPostgresRepository : IBankReadRepository, IBankWriteRepository
 {
-    private readonly BankDbContext _dbContext;
+    private readonly BankDbContext _writeDbContext;
+    private readonly IReadDbContextFactory<BankDbContext> _readDbContextFactory;
 
-    public BankPostgresRepository(BankDbContext dbContext)
+    public BankPostgresRepository(
+        BankDbContext writeDbContext,
+        IReadDbContextFactory<BankDbContext> readDbContextFactory)
     {
-        _dbContext = dbContext;
+        _writeDbContext = writeDbContext;
+        _readDbContextFactory = readDbContextFactory;
     }
 
     public async Task<BankTransfer?> GetByCprAsync(string cpr)
     {
-        var entity = await _dbContext.BankTransfers.FindAsync(cpr);
+        await using var readDbContext = _readDbContextFactory.CreateDbContext();
+        var entity = await readDbContext.BankTransfers.AsNoTracking().FirstOrDefaultAsync(b => b.Cpr == cpr);
         return entity?.ToDomain();
     }
 
     public async Task SaveAsync(BankTransfer transfer)
     {
-        var existing = await _dbContext.BankTransfers.FindAsync(transfer.Cpr);
+        var existing = await _writeDbContext.BankTransfers.FindAsync(transfer.Cpr);
         if (existing is null)
         {
-            _dbContext.BankTransfers.Add(BankTransferEntity.FromDomain(transfer));
+            _writeDbContext.BankTransfers.Add(BankTransferEntity.FromDomain(transfer));
         }
         else
         {
@@ -34,7 +40,7 @@ public class BankPostgresRepository : IBankReadRepository, IBankWriteRepository
             existing.Status = transfer.Status;
         }
 
-        await _dbContext.SaveChangesAsync();
+        await _writeDbContext.SaveChangesAsync();
     }
 }
 

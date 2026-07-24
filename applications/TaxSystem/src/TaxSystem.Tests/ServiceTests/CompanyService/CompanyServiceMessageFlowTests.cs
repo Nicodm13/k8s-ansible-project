@@ -7,6 +7,7 @@ using TaxSystem.CompanyService.Persistance;
 using TaxSystem.CompanyService.Repositories;
 using TaxSystem.Shared.Messaging.Contracts;
 using TaxSystem.Shared.Models;
+using TaxSystem.Shared.Persistance;
 using BackendCompanyService = TaxSystem.CompanyService.Services.CompanyService;
 
 namespace TaxSystem.Tests.ServiceTests.CompanyService;
@@ -268,10 +269,14 @@ public class CompanyServiceMessageFlowTests
     private ServiceProvider BuildProvider(Action<IInMemoryBusFactoryConfigurator> configure)
     {
         var services = new ServiceCollection();
+        var dbContextOptions = new DbContextOptionsBuilder<CompanyDbContext>()
+            .UseSqlite(_sqliteConnection)
+            .Options;
         services.AddDbContext<CompanyDbContext>(options =>
         {
             options.UseSqlite(_sqliteConnection);
         });
+        services.AddSingleton<IReadDbContextFactory<CompanyDbContext>>(new TestReadDbContextFactory<CompanyDbContext>(dbContextOptions));
         services.AddScoped<IReadCompanyRepository, CompanyPostgresRepository>();
         services.AddScoped<IWriteCompanyRepository, CompanyPostgresRepository>();
         services.AddScoped<BackendCompanyService>();

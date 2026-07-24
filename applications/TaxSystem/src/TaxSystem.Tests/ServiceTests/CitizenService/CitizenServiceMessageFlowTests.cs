@@ -7,6 +7,7 @@ using TaxSystem.CitizenService.Persistance;
 using TaxSystem.CitizenService.Repositories;
 using TaxSystem.Shared.Messaging.Contracts;
 using TaxSystem.Shared.Models;
+using TaxSystem.Shared.Persistance;
 using BackendCitizenService = TaxSystem.CitizenService.Services.CitizenService;
 
 namespace TaxSystem.Tests.ServiceTests.CitizenService;
@@ -173,10 +174,14 @@ public class CitizenServiceMessageFlowTests
     private ServiceProvider BuildProvider(Action<IInMemoryBusFactoryConfigurator> configure)
     {
         var services = new ServiceCollection();
+        var dbContextOptions = new DbContextOptionsBuilder<CitizenDbContext>()
+            .UseSqlite(_sqliteConnection)
+            .Options;
         services.AddDbContext<CitizenDbContext>(options =>
         {
             options.UseSqlite(_sqliteConnection);
         });
+        services.AddSingleton<IReadDbContextFactory<CitizenDbContext>>(new TestReadDbContextFactory<CitizenDbContext>(dbContextOptions));
         services.AddScoped<IReadCitizenRepository, CitizenPostgresRepository>();
         services.AddScoped<IWriteCitizenRepository, CitizenPostgresRepository>();
         services.AddScoped<BackendCitizenService>();

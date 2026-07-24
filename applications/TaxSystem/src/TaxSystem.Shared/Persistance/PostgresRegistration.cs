@@ -43,6 +43,7 @@ public static class PostgresRegistration
 
         // Register a named read-only DbContext options for CQRS read repositories
         services.AddSingleton(new ReadOnlyConnectionString(readConnection));
+        services.AddSingleton<IReadDbContextFactory<TContext>, PostgresReadDbContextFactory<TContext>>();
 
         return services;
     }
@@ -64,4 +65,35 @@ public static class PostgresRegistration
 /// </summary>
 public sealed record ReadOnlyConnectionString(string Value);
 
+public interface IReadDbContextFactory<out TContext>
+    where TContext : DbContext
+{
+    TContext CreateDbContext();
+}
+
+public sealed class PostgresReadDbContextFactory<TContext> : IReadDbContextFactory<TContext>
+    where TContext : DbContext
+{
+    private readonly ReadOnlyConnectionString _connectionString;
+
+    public PostgresReadDbContextFactory(ReadOnlyConnectionString connectionString)
+    {
+        _connectionString = connectionString;
+    }
+
+    public TContext CreateDbContext()
+    {
+        var options = new DbContextOptionsBuilder<TContext>()
+            .UseNpgsql(_connectionString.Value, npgsqlOptions =>
+            {
+                npgsqlOptions.EnableRetryOnFailure(
+                    maxRetryCount: 3,
+                    maxRetryDelay: TimeSpan.FromSeconds(5),
+                    errorCodesToAdd: null);
+            })
+            .Options;
+
+        return (TContext)Activator.CreateInstance(typeof(TContext), options)!;
+    }
+}
 
