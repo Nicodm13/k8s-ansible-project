@@ -21,6 +21,8 @@ spec:
           topologyKey: kubernetes.io/hostname
           nodeTaintsPolicy: Honor
           whenUnsatisfiable: DoNotSchedule
+          matchLabelKeys:
+            - pod-template-hash
           labelSelector:
             matchLabels:
               app: statementgenerator-service
