@@ -14,19 +14,4 @@
         <PackageReference Include="Npgsql.EntityFrameworkCore.PostgreSQL" Version="10.0.0" />
     </ItemGroup>
 
-    <ItemGroup>
-      <Content Include="..\AGENTS.md">
-        <Link>AGENTS.md</Link>
-      </Content>
-      <Content Include="..\persistence.md">
-        <Link>persistence.md</Link>
-      </Content>
-      <Content Include="..\run-tests.sh">
-        <Link>run-tests.sh</Link>
-      </Content>
-      <Content Include="..\TESTING.md">
-        <Link>TESTING.md</Link>
-      </Content>
-    </ItemGroup>
-
 </Project>

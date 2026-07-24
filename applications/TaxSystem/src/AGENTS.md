@@ -2,143 +2,162 @@
 
 ## Architecture Overview
 
-**TaxSystem** is an event-driven microservices architecture student project for tax processing:
-- **Client** (ASP.NET Core): API gateway and entry point; publishes commands or routes requests into the service flow
-- **Microservices**: CitizenService, CompanyService, BankService, StatementGeneratorService
-- **TaxSystem.Shared**: Central models, typed MassTransit contracts, RabbitMQ configuration, and filesystem persistence helper
-- **Communication**: MassTransit over RabbitMQ using typed command/event records from `TaxSystem.Shared/Messaging/Contracts`
-- **Persistence**: Temporary JSON filesystem persistence through `TaxSystem.Shared.Persistance.FileSystemRepository`
+TaxSystem is an event-driven .NET microservice system for tax processing.
 
-## Critical Data Flows
+- `TaxSystem.Client`: ASP.NET Core API gateway and public HTTP entry point.
+- `TaxSystem.CitizenService`: citizen registration, deregistration, and lookup.
+- `TaxSystem.CompanyService`: company registration, updates, and salary reporting.
+- `TaxSystem.BankService`: bank transfer scheduling and lookup.
+- `TaxSystem.StatementGeneratorService`: deductible reporting and tax statement generation.
+- `TaxSystem.Shared`: shared domain models, MassTransit contracts, RabbitMQ setup, and PostgreSQL registration helpers.
 
-1. **Report Salary** (ReportSalary.feature):
-   - Client receives salary report (company CVR, employee CPR, amount)
-   - Publishes or routes a typed salary-reporting command/event
-   - CompanyService and StatementGeneratorService participate in the statement generation flow
+Services communicate through typed MassTransit contracts over RabbitMQ. Service data is persisted in PostgreSQL databases managed by CloudNativePG in Kubernetes.
 
-2. **Request Statement** (RequestStatement.feature):
-   - Client requests tax statement for citizen
-   - Services aggregate data, generate final statement
+## Current Runtime Model
 
-**Key**: Inter-service communication uses typed MassTransit records. Do not reintroduce the old `Event` class, topic/argument arrays, or `IMessageQueue` abstraction.
+Production/GitOps manifests live one directory above this source tree in `applications/TaxSystem/`.
 
-## Messaging Pattern - Know This
+- `client` is a Kubernetes `Deployment`.
+- `citizen-service`, `company-service`, `bank-service`, and `statementgenerator-service` are Kubernetes `StatefulSet` workloads.
+- RabbitMQ is installed by the Flux-managed HelmRelease under `infrastructure/messaging/rabbitmq`.
+- PostgreSQL is managed by the CloudNativePG `Cluster` named `taxsystem-db`.
+- Traefik exposes the client through `taxsystem.kvikit.dk`.
 
-Messaging is based on MassTransit:
+The application images are built by GitHub Actions, pushed to GitHub Container Registry, and written back into the Kubernetes manifests for Flux to deploy.
+
+## Messaging Rules
+
+Messaging is based on MassTransit.
+
 - Contracts live in `TaxSystem.Shared/Messaging/Contracts/` as public sealed records.
 - Services call `builder.Services.AddTaxSystemRabbitMq(builder.Configuration)` in `Program.cs`.
-- Consumer classes implementing `IConsumer<TContract>` are auto-registered from the entry assembly by the shared MassTransit registration.
-- Tests can use MassTransit in-memory transport for service-level message tests.
-- Production and E2E messaging uses RabbitMQ.
+- Consumer classes implementing `IConsumer<TContract>` are auto-registered from the entry assembly.
+- Production and E2E tests use RabbitMQ.
+- Service-level tests may use MassTransit in-memory transport when infrastructure should not be required.
+
+Do not reintroduce the old `Event` class, topic/argument arrays, `IMessageQueue`, `MessageQueueSync`, `MessageQueueAsync`, or `RabbitMqQueue` abstractions.
 
 RabbitMQ configuration:
-- Non-secret config is read from `appsettings.json` under `RabbitMq` (`Host`, `Port`, `VirtualHost`).
-- Credentials must come from environment variables: `RABBITMQ_USERNAME` and `RABBITMQ_PASSWORD`.
-- Do not hardcode RabbitMQ credentials in code or appsettings.
+
+- Non-secret defaults are read from `appsettings.json` under `RabbitMq`.
+- Credentials must come from `RABBITMQ_USERNAME` and `RABBITMQ_PASSWORD`.
+- Do not hardcode RabbitMQ credentials in C# code or appsettings files.
 
 Example contract:
+
 ```csharp
 namespace TaxSystem.Shared.Messaging.Contracts;
 
 public sealed record CitizenRegistered(string Cpr, string Name);
 ```
 
+## Persistence Rules
+
+The current deployed persistence path is PostgreSQL through Entity Framework Core.
+
+- Shared registration lives in `TaxSystem.Shared/Persistance/PostgresRegistration.cs`.
+- Services call `builder.Services.AddTaxSystemPostgres<TDbContext>()`.
+- Each service owns its own PostgreSQL database.
+- CloudNativePG creates the databases in `applications/TaxSystem/postgres-cluster.yaml`.
+- Connection strings are supplied through Kubernetes secrets and environment variables.
+
+Connection environment variables:
+
+- `TAXSYSTEM_DB_CONNECTION_WRITE`: write connection, routed to `taxsystem-db-rw`.
+- `TAXSYSTEM_DB_CONNECTION_READ`: read connection, routed to `taxsystem-db-ro`.
+- `TAXSYSTEM_DB_CONNECTION`: fallback for single-connection local/dev setups.
+
+Repository convention:
+
+- Keep separate read/write interfaces, for example `IReadCitizenRepository` and `IWriteCitizenRepository`.
+- PostgreSQL repository implementations are the active persistence path.
+- `FileSystemRepository` still exists as shared utility/test-era code, but do not make it the production persistence path again.
+
+Each service calls `Database.EnsureCreatedAsync()` on startup. After resetting the CloudNativePG cluster, restart the services so they recreate their tables.
+
+## Critical Data Flows
+
+Report salary:
+
+- Client receives a salary report request.
+- Client publishes or requests typed MassTransit messages.
+- CompanyService records salary information.
+- StatementGeneratorService consumes tax information and uses it for statement generation.
+
+Request statement:
+
+- Client requests a statement for a citizen.
+- StatementGeneratorService gathers stored tax information.
+- If enough information exists, a statement is generated and returned through the request flow.
+
+Register citizen/company:
+
+- Client receives HTTP requests.
+- The relevant service consumes typed registration messages.
+- The service persists data in its PostgreSQL database.
+
 ## Testing Strategy
 
-**TaxSystem.Tests** (in-process, fast feedback):
-- Uses Reqnroll for BDD scenarios
-- `SharedStepDefinitions.cs`: Common "Given" steps (company setup, employee setup)
-- Feature-specific step files: ReportSalaryStepDefinitions.cs, RequestStatementStepDefinitions.cs
-- Test state shared via `ScenarioContext` across step classes
-- Uses MassTransit in-memory transport for message tests where needed
-- Repository persistence tests use temporary filesystem folders and `FileSystemRepository`
-- Run: `dotnet test TaxSystem.Tests/TaxSystem.Tests.csproj`
+`TaxSystem.Tests` provides service-level, fast feedback tests.
 
-**TaxSystem.Tests.E2E** (full stack, requires Minikube):
-- HTTP requests to Client API gateway
-- Real RabbitMQ broker through MassTransit
-- Requires environment variables: CLIENT_BASE_URL, RABBITMQ_HOST/PORT/USERNAME/PASSWORD
-- Run: `dotnet test TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj`
+- Uses Reqnroll for BDD scenarios.
+- Feature files live under `TaxSystem.Tests/Features/`.
+- Step definitions use `ScenarioContext` for scenario state.
+- Run with `dotnet test TaxSystem.Tests/TaxSystem.Tests.csproj`.
 
-## Kubernetes & Docker
+`TaxSystem.Tests.E2E` provides full-stack tests.
 
-**Pattern**: Multi-stage builds (SDK → build → runtime-only final image):
-- Base image: `mcr.microsoft.com/dotnet/runtime:10.0` (services) or `aspnet:10.0` (Client)
-- Production/GitOps manifests live in `applications/TaxSystem/`; the test runner renders them with Minikube-local image overrides when running E2E tests.
-- Services discovered via Kubernetes DNS: `{service-name}` (e.g., `citizen-service:5000`)
-- RabbitMQ runs as service `rabbitmq`; in cluster deployments the host is usually `rabbitmq.taxsystem.svc.cluster.local`
-- Persistent service data is mounted at `/var/lib/taxsystem` with `TAXSYSTEM_DATA_PATH=/var/lib/taxsystem`
+- Uses HTTP requests against `TaxSystem.Client`.
+- Requires a running client endpoint and RabbitMQ.
+- In normal local/CI use, run `./run-tests.sh` instead of invoking E2E tests directly.
+- Direct E2E execution uses `CLIENT_BASE_URL`, `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USERNAME`, and `RABBITMQ_PASSWORD`.
 
-## Service Structure Conventions
+## Local Commands
 
-All service projects follow this layout:
-```
-TaxSystem.{ServiceName}/
-├── Program.cs              # Host setup, MassTransit, repository DI
-├── Repositories/           # Data persistence layer
-│   ├── IRead{Entity}Repository.cs
-│   ├── IWrite{Entity}Repository.cs
-│   └── {Entity}Repository.cs
-├── Services/               # Business logic
-│   └── {Service}.cs
-└── Dockerfile              # Multi-stage build
-```
-
-Repository pattern:
-- Each service has separate read/write interfaces.
-- One concrete repository can implement both interfaces.
-- Repositories currently wrap `FileSystemRepository` and store JSON under service-specific subdirectories such as `citizens`, `companies`, `bank-transfers`, and `statements`.
-- This is temporary persistence and should be replaceable later by DI with PostgreSQL/CloudNativePG-backed implementations.
-
-## Build & Deployment Commands
+Run from `applications/TaxSystem/src`.
 
 ```bash
-# Build all projects
 dotnet build TaxSystem.sln
-
-# Run service-level tests (no infrastructure)
 dotnet test TaxSystem.Tests/TaxSystem.Tests.csproj
-
-# Run E2E tests (requires Minikube + services running)
-export CLIENT_BASE_URL=http://localhost:8080
-export RABBITMQ_HOST=localhost
-export RABBITMQ_PORT=5672
-export RABBITMQ_USERNAME=guest
-export RABBITMQ_PASSWORD=guest
-dotnet test TaxSystem.Tests.E2E/TaxSystem.Tests.E2E.csproj
-
-# Deploy to Minikube using the root manifests with local-image overrides
-./run-tests.sh --skip-unit
+./run-tests.sh
 ```
 
-## Project Dependencies & Versions
+`run-tests.sh` builds and publishes services, runs service-level tests, deploys the application stack to Minikube, waits for PostgreSQL/RabbitMQ/application readiness, and then runs E2E tests.
 
-- **.NET 10.0** (latest LTS)
-- **Reqnroll 3.3.4**: BDD test framework (Gherkin)
-- **MassTransit.RabbitMQ**: RabbitMQ integration through MassTransit
-- **NUnit 4.5.1**: Test runner
-- **ASP.NET Core 10.0**: Client gateway
+The script must run from a Linux filesystem, not a Windows-mounted WSL path, because .NET and Docker need Unix file permissions.
+
+## Docker And Images
+
+The service Dockerfiles expect pre-published output under `publish/<ProjectName>/`.
+
+The normal build flow is:
+
+1. `dotnet build TaxSystem.sln --configuration Release`
+2. `dotnet publish ... -o publish/<ProjectName> /p:UseAppHost=false`
+3. `docker build -f <Project>/Dockerfile -t <image> .`
+
+Do not assume the Dockerfiles perform a full SDK build inside the image. They copy published output into .NET runtime/ASP.NET runtime images.
 
 ## Key File Locations
 
 | Purpose | File |
 |---------|------|
+| Solution | `TaxSystem.sln` |
 | Messaging setup | `TaxSystem.Shared/Messaging/MassTransitRabbitMqRegistration.cs` |
 | Message contracts | `TaxSystem.Shared/Messaging/Contracts/` |
 | RabbitMQ options | `TaxSystem.Shared/Messaging/RabbitMqOptions.cs` |
-| Filesystem persistence | `TaxSystem.Shared/Persistance/FileSystemRepository.cs` |
+| PostgreSQL registration | `TaxSystem.Shared/Persistance/PostgresRegistration.cs` |
 | Domain models | `TaxSystem.Shared/Models/` |
-| Test workflows | `TaxSystem.Tests/Features/` (ReportSalary.feature, RequestStatement.feature) |
-| K8s deployments | `../` from `src` (`applications/TaxSystem/*.yaml`) |
-| CI pipeline | repo-root `.github/workflows/` |
-| Test config | `TESTING.md` (comprehensive test documentation) |
+| Production manifests | `../*.yaml` from this directory |
+| Local/CI test runner | `run-tests.sh` |
+| GitHub workflows | repo-root `.github/workflows/` |
 
 ## Common Pitfalls
 
-1. **Old messaging abstractions**: Do not use or recreate `Event`, `IMessageQueue`, `MessageQueueSync`, `MessageQueueAsync`, or `RabbitMqQueue`. Use MassTransit typed contracts.
-2. **RabbitMQ secrets**: Keep username/password in `RABBITMQ_USERNAME` and `RABBITMQ_PASSWORD`, never in appsettings.
-3. **ScenarioContext usage**: In Reqnroll step classes, always store/retrieve test state via ScenarioContext, not static fields.
-4. **K8s service discovery**: Use Kubernetes service names from inside containers, not localhost.
-5. **Feature file regex**: Reqnroll step binding uses regex (e.g., `@"a company with CVR ""(.*)"""`). Regex must match the .feature file step text exactly.
-6. **Dockerfile context**: Docker builds expect the source root at `/src`, with individual project paths relative to that.
-
+1. Do not change Kubernetes StatefulSet immutable fields casually. Existing StatefulSets may need explicit recreation if fields outside the allowed update set change.
+2. Do not use localhost for service-to-service communication inside Kubernetes. Use Kubernetes service names.
+3. Do not hardcode RabbitMQ or PostgreSQL credentials in C# code or appsettings files.
+4. Keep Reqnroll step regexes aligned with the exact feature-file text.
+5. Keep test state in `ScenarioContext`, not static fields.
+6. Keep production changes in Git manifests so Flux can reconcile them.
+7. If CloudNativePG is reset, restart the TaxSystem services so EF can recreate tables.
